@@ -11,7 +11,7 @@
 # Load micromamba + env
 module load micromamba
 eval "$(micromamba shell hook --shell=bash)"
-micromamba activate /mnt/vast-kisski/projects/kisski-dpz-alpaca-hum/envs/animal-spot
+micromamba activate /user/d.arizaecheverri/u17184/micromamba/envs/animal-spot
 
 # Run the training script
-python ./ANIMAL-SPOT/TRAINING/start_training.py TRAINING/monkparakeet_server.cfg
+python /user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/start_training.py /user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/monkparakeet_server.cfg

@@ -28,6 +28,8 @@ from utils.confusionmeter import ConfusionMeter
 from utils.early_stopping import EarlyStoppingCriterion
 from utils.summary import prepare_img, roc_fig, confusion_matrix_fig
 
+from tqdm import tqdm
+
 """
 Class which implements network training, validation and testing as well as writing checkpoints, logs, summaries, and saving the final model.
 """
@@ -244,7 +246,7 @@ class Trainer:
             auc = None
             confusion = ConfusionMeter(n_categories=train_loader.dataset.num_classes)
 
-        for i, (features, label) in enumerate(train_loader):
+        for i, (features, label) in enumerate(tqdm(train_loader, desc=f"Epoch {epoch}", ncols=80)):
             features = features.to(device)
             call_label = None
 
@@ -344,7 +346,7 @@ class Trainer:
                 auc = None
                 confusion = ConfusionMeter(n_categories=test_loader.dataset.num_classes)
 
-            for i, (features, label) in enumerate(test_loader):
+            for i, (features, label) in enumerate(tqdm(test_loader, desc=f"Epoch {epoch}", ncols=80)):
                 features = features.to(device)
                 call_label = None
 
