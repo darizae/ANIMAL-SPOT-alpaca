@@ -1,0 +1,27 @@
+# Ignore Python bytecode and cache
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environments
+venv/
+env/
+.env/
+
+# Ignore JetBrains IDE project files (PyCharm, IntelliJ, etc.)
+.idea/
+.idea/**
+
+# Ignore Mac system files
+.DS_Store
+
+# Ignore Windows system files
+Thumbs.db
+
+# Optionally ignore logs
+*.log
+
+dist/
+build/
+*.egg-info/
+
+*.env
