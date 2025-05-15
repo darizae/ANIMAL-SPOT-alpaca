@@ -267,7 +267,7 @@ parser.add_argument(
 
 ARGS = parser.parse_args()
 ARGS.cuda = torch.cuda.is_available() and ARGS.cuda
-ARGS.device = torch.device("cuda") if ARGS.cuda else torch.device("cpu")
+ARGS.device = torch.device("cuda") if ARGS.cuda else torch.device("mps")
 
 if ARGS.conv_kernel_size is not None and len(ARGS.conv_kernel_size):
     ARGS.conv_kernel_size = ARGS.conv_kernel_size[0]
