@@ -3,7 +3,7 @@ set -euo pipefail
 
 REMOTE_USER="u17184"
 REMOTE_HOST="glogin-gpu.hpc.gwdg.de"
-REMOTE_PATH="/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/PREDICTION/runs"
+REMOTE_PATH="/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/PREDICTION/server_runs"
 
 LOCAL_PATH="$HOME/repos/ANIMAL-SPOT-alpaca/PREDICTION/server_runs"
 
