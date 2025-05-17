@@ -26,4 +26,5 @@ build/
 
 *.env
 
-./TRAINING/runs/*
+TRAINING/runs/
+TRAINING/server_runs/
