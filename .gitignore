@@ -31,3 +31,4 @@ TRAINING/server_runs/
 job_logs/
 PREDICTION/runs/
 PREDICTION/server_runs/
+EVALUATION/evaluation_annotations/
