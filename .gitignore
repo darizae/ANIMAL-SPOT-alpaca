@@ -28,3 +28,4 @@ build/
 
 TRAINING/runs/
 TRAINING/server_runs/
+job_logs/
