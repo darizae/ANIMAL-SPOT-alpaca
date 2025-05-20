@@ -305,6 +305,7 @@ class setup_evaluator(object):
         return threshold_depended_annotation_data_overlapped
 
     def write_annotation_file(self, path_annotation_file, annotation_data):
+        os.makedirs(os.path.dirname(path_annotation_file), exist_ok=True)
         iterator = 1
         annotated_prediction_file = open(path_annotation_file, 'w')
         annotated_prediction_file.write("\t".join(self.needed_annotation_columns)+"\n")
