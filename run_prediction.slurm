@@ -17,4 +17,4 @@ eval "$(micromamba shell hook --shell=bash)"
 micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
 
 python /user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/PREDICTION/start_prediction.py \
-       /user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/PREDICTION/cfg/alpaca_server_pred.cfg
+       /user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/PREDICTION/cfg/pred_seq_len_300/alpaca_server_pred.cfg
