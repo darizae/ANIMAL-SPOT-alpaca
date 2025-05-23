@@ -6,10 +6,10 @@ set -euo pipefail
 # SSH credentials & paths
 REMOTE_USER="u17184"
 REMOTE_HOST="glogin-gpu.hpc.gwdg.de"
-REMOTE_PATH="/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/runs"
+REMOTE_PATH="/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/server_runs/seq_len_300"
 
 # Local destination (inside your Mac’s home directory)
-LOCAL_PATH="$HOME/repos/ANIMAL-SPOT-alpaca/TRAINING/server_runs"
+LOCAL_PATH="$HOME/repos/ANIMAL-SPOT-alpaca/TRAINING/server_runs/seq_len_300"
 
 # ─── SCRIPT ─────────────────────────────────────────────────────────────────────
 
