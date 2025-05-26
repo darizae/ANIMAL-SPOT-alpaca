@@ -182,8 +182,9 @@ class setup_evaluator(object):
                 first_el = False
             if str(pred) != str(get_dict_key_ignorecase(self.classes_label_idx, "noise")):
                 if time_info:
-                    if round(time_info[-1][0][1], 3) >= round(time[0], 3) and (str(time_info[-1][1]) == str(pred)):
-                        time_info[-1] = (([round(time_info[-1][0][0], 3), round(time[1], 3)], pred))
+                    merge_margin = 2.0  # seconds
+                    if round(time[0] - time_info[-1][0][1], 3) <= merge_margin and (str(time_info[-1][1]) == str(pred)):
+                        time_info[-1] = ([round(time_info[-1][0][0], 3), round(time[1], 3)], pred)
                     elif round(time_info[-1][0][1], 3) >= round(time[0], 3) and (str(time_info[-1][1]) != str(pred)):
                         time_info.append(([time_info[-1][0][1], round(time[1], 3)], pred))
                     else:
