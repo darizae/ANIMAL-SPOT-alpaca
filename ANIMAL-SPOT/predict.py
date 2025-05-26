@@ -7,11 +7,13 @@ License: GNU General Public License v3.0
 Institution: Friedrich-Alexander-University Erlangen-Nuremberg, Department of Computer Science, Pattern Recognition Lab
 Last Access: 27.12.2022
 """
-
+import csv
+import hashlib
 import os
 import pickle
 import platform
 import argparse
+import shutil
 
 import torch
 import torch.nn as nn
@@ -49,7 +51,7 @@ parser.add_argument(
     type=str,
     default=None,
     help="Path to a checkpoint. "
-    "If provided the checkpoint will be used instead of the model.",
+         "If provided the checkpoint will be used instead of the model.",
 )
 
 parser.add_argument(
@@ -125,6 +127,8 @@ parser.add_argument(
 """
 save the extracted features 
 """
+
+
 def save_pickle(path, features, name=None):
     if not os.path.isdir(path):
         os.makedirs(path)
@@ -136,18 +140,22 @@ def save_pickle(path, features, name=None):
         with open(path + "/" + name + ".p", "wb") as f:
             pickle.dump(features, f)
 
+
 """
 load the extracted features 
 """
+
+
 def load_pickle(path):
     if path.endswith(".p"):
         with open(path, "rb") as f:
             features = pickle.load(f)
     else:
-        with open(path+"/features.p", "rb") as f:
+        with open(path + "/features.p", "rb") as f:
             features = pickle.load(f)
 
     return features
+
 
 ARGS = parser.parse_args()
 
@@ -155,10 +163,39 @@ log = PredictionLogger("PREDICT", ARGS.debug, ARGS.log_dir)
 
 models = {"encoder": 1, "classifier": 2}
 
+
+def cfg_hash():
+    """Return a short SHA1 hash that changes whenever any key
+    that affects model output changes."""
+    relevant = {
+        "model_path": ARGS.model_path,
+        "sequence_len": ARGS.sequence_len,
+        "hop": ARGS.hop,
+        "threshold": ARGS.threshold,
+        "jit_load": ARGS.jit_load,
+        "min_max_norm": ARGS.min_max_norm,
+    }
+    digest = hashlib.sha1(
+        "|".join(f"{k}={v}" for k, v in sorted(relevant.items())).encode()
+    ).hexdigest()[:10]  # 10 chars is enough to avoid clashes
+    return digest
+
+
+def predictions_path(basename, where):
+    """Return full path to the per-file prediction TSV inside `where`."""
+    return where / f"{basename}.pred.tsv"
+
+
 """
 Main function to compute prediction (segmentation) by using a trained model together with a given audio tape by processing a sliding window approach
 """
 if __name__ == "__main__":
+
+    CACHE_ROOT = None
+    if ARGS.output_dir:
+        CACHE_ROOT = Path(ARGS.output_dir) / "_cache" / cfg_hash()
+        CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+
     if ARGS.jit_load:
         extra_files = {'dataOpts': '', 'classes': ''}
         model = torch.jit.load(ARGS.model_path, _extra_files=extra_files)
@@ -206,18 +243,22 @@ if __name__ == "__main__":
     DefaultSpecDatasetOps["ref_level_db"] = dataOpts["ref_level_db"]
 
     log.debug("dataOpts: " + str(dataOpts))
-    log.debug("prediction length: " + str(ARGS.sequence_len) + "[s], hop length: " + str(ARGS.hop) + "[s], threshold: " + str(ARGS.threshold) + ", prediction fmin: " + str(fmin) + "[Hz], prediction fmax: " + str(fmax) + "[Hz]")
+    log.debug(
+        "prediction length: " + str(ARGS.sequence_len) + "[s], hop length: " + str(ARGS.hop) + "[s], threshold: " + str(
+            ARGS.threshold) + ", prediction fmin: " + str(fmin) + "[Hz], prediction fmax: " + str(fmax) + "[Hz]")
     sequence_len = int(ceil(ARGS.sequence_len * sr))
     hop = int(ceil(ARGS.hop * sr))
 
     if ARGS.input_file is None:
         raise Exception("no audio file or directory of audio files have been specified!")
 
+
     def get_class_type_from_idx(idx):
         for t, n in class_dist_dict.items():
             if n == idx:
                 return t
         raise ValueError("Unkown class type for idx ", idx)
+
 
     if os.path.isdir(ARGS.input_file):
         audio_folder = Path(ARGS.input_file)
@@ -233,7 +274,6 @@ if __name__ == "__main__":
     log.close()
 
     if ARGS.latent_extract:
-
         file_names = []
         feature_array = []
         spectra_input = []
@@ -247,11 +287,27 @@ if __name__ == "__main__":
         if platform.system() == "Windows":
             if audio_folder is not None:
                 file_name = str(audio_folder) + "\\" + str(file_name)
-            file_log = PredictionLogger(file_name.split("\\")[-1].split(".")[0].strip() + "_predict_output", ARGS.debug, ARGS.output_dir)
+            file_log = PredictionLogger(file_name.split("\\")[-1].split(".")[0].strip() + "_predict_output", ARGS.debug,
+                                        ARGS.output_dir)
         else:
             if audio_folder is not None:
                 file_name = str(audio_folder) + "/" + str(file_name)
-            file_log = PredictionLogger(file_name.split("/")[-1].split(".")[0].strip() + "_predict_output", ARGS.debug, ARGS.output_dir)
+            file_log = PredictionLogger(file_name.split("/")[-1].split(".")[0].strip() + "_predict_output", ARGS.debug,
+                                        ARGS.output_dir)
+
+        basename = Path(file_name).stem  # already exists in code, but keep explicit
+        cached_pred_file = predictions_path(basename, CACHE_ROOT) if CACHE_ROOT else None
+
+        # -- skip if cached --
+        if cached_pred_file and cached_pred_file.exists():
+            log.info(f"[CACHE] Skipping {file_name} – predictions already computed.")
+            # copy cached file to current output_dir so user can find it
+            if ARGS.output_dir:
+                dst = predictions_path(basename, Path(ARGS.output_dir))
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                if not dst.exists():
+                    shutil.copy(cached_pred_file, dst)
+            continue
 
         file_log.info(file_name)
         file_log.info("Model Path: " + str(ARGS.model_path))
@@ -291,6 +347,8 @@ if __name__ == "__main__":
         stop = int(max(floor(dataset.n_frames / hop), 1))
         file_log.info("stop time={}".format(stop))
 
+        predictions = []  # we’ll store tuples (start_s, end_s, pred_idx, prob)
+
         with torch.no_grad():
             for i, input in enumerate(data_loader):
                 if torch.cuda.is_available() and ARGS.cuda:
@@ -299,8 +357,8 @@ if __name__ == "__main__":
                 out = model(input).cpu()
 
                 if ARGS.latent_extract:
-
-                    feature_array.append(model.classifier.get_layer_output()["hidden_layer_1"].cpu().detach().squeeze().numpy())
+                    feature_array.append(
+                        model.classifier.get_layer_output()["hidden_layer_1"].cpu().detach().squeeze().numpy())
                     spectra_input.append(input)
 
                 for n in range(out.shape[0]):
@@ -310,8 +368,8 @@ if __name__ == "__main__":
                     file_log.debug("end extract={}".format(t_end))
 
                     if ARGS.latent_extract:
-
-                        file_names.append(file_name.replace(".wav", "")+"_"+str(round(t_start / sr, 3))+"_"+str(round(t_end / sr, 3))+".wav")
+                        file_names.append(file_name.replace(".wav", "") + "_" + str(round(t_start / sr, 3)) + "_" + str(
+                            round(t_end / sr, 3)) + ".wav")
 
                     if num_classes == 2:
                         prob = torch.nn.functional.softmax(out, dim=1).numpy()[n, 1]
@@ -334,9 +392,17 @@ if __name__ == "__main__":
 
                         pred = int(detected_class_lbl_prob >= ARGS.threshold)
 
+                        predictions.append(
+                            (round(t_start / sr, 3),
+                             round(t_end / sr, 3),
+                             int(pred),
+                             prob)
+                        )
+
                         file_log.info(
                             "time={}-{}, pred={}, pred_class={}-{}, prob={}\noutput_layer:{}".format(
-                                round(t_start / sr, 3), round(t_end / sr, 3), pred, detected_class_lbl, reslut_class_idx.item(),
+                                round(t_start / sr, 3), round(t_end / sr, 3), pred, detected_class_lbl,
+                                reslut_class_idx.item(),
                                 detected_class_lbl_prob, output
                             )
                         )
@@ -346,7 +412,8 @@ if __name__ == "__main__":
 
                 if ARGS.visualize:
                     plot_spectrogram(spectrogram=input.cpu().squeeze(dim=0).squeeze(dim=0), title="Spectrogram",
-                                     output_filepath=ARGS.output_dir + "/net_input_spec_" + str(i) + "_" + str(detected_class_lbl) + "_" +
+                                     output_filepath=ARGS.output_dir + "/net_input_spec_" + str(i) + "_" + str(
+                                         detected_class_lbl) + "_" +
                                                      file_name.split("/")[-1].split(".")[0] + ".pdf",
                                      sr=sr, hop_length=hop_length, fmin=fmin, fmax=fmax, show=False,
                                      ax_title="spectrogram")
@@ -354,6 +421,21 @@ if __name__ == "__main__":
     if ARGS.latent_extract:
         save_pickle(ARGS.output_dir, features, "animal-spot-classifier")
         file_log.debug("Successfully saved latent classification features (final hidden layer)!")
+
+    # 1) write predictions to TSV in output_dir
+    if ARGS.output_dir:
+        pred_file = predictions_path(basename, Path(ARGS.output_dir))
+        pred_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(pred_file, "w", newline="") as f:
+            writer = csv.writer(f, delimiter="\t")
+            writer.writerow(["start_s", "end_s", "class_idx", "prob"])
+            writer.writerows(predictions)
+
+    # 2) copy to cache & touch .done marker
+    if CACHE_ROOT:
+        cached_pred_file.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(pred_file, cached_pred_file)
+        (CACHE_ROOT / (basename + ".done")).touch()
 
     file_log.debug("Finished proccessing")
 
