@@ -2,14 +2,13 @@
 """
 Generate one ANIMAL-SPOT cfg + one Slurm array script per training variant.
 
-Usage:
-    python build_train_jobs.py  train_variants.json
 Result:
     TRAINING/cfg/<variant>/alpaca_server.cfg
     TRAINING/jobs/train_models.sbatch      (array calls start_training.py)
 """
+
 from __future__ import annotations
-import argparse, json, shutil, textwrap, os
+import json, shutil, textwrap, os
 from datetime import datetime
 from pathlib import Path
 
@@ -78,10 +77,9 @@ python {repo_root}/TRAINING/start_training.py "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("json", type=Path)
-    args = ap.parse_args()
-    cfg = json.loads(args.json.read_text())
+    # Hardcoded path to JSON config
+    json_path = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/tools/train_variants.json")
+    cfg = json.loads(json_path.read_text())
 
     repo_root = Path(__file__).resolve().parents[2]  # repos/ANIMAL-SPOT-alpaca
     runs_root = Path(cfg["globals"]["runs_root"])
@@ -96,7 +94,6 @@ def main():
         cfg_dir = repo_root / "TRAINING" / "cfg" / name
         cfg_dir.mkdir(parents=True, exist_ok=True)
 
-        # path to prepared dataset on server
         data_dir = f"{g['data_root']}/{g['dataset']}"
 
         filled = TEMPLATE_CFG.format(
@@ -127,15 +124,17 @@ def main():
         runs_root=runs_root,
         repo_root=repo_root,
         max_idx=len(config_paths) - 1,
-        concurrency=len(config_paths),  # run all at once; change if you like
+        concurrency=len(config_paths),
         config_paths=" ".join(str(p) for p in config_paths)
     )
     jobs_dir = repo_root / "TRAINING" / "jobs"
     jobs_dir.mkdir(exist_ok=True)
     (jobs_dir / "train_models.sbatch").write_text(sbatch_txt)
+
     print(f"✔ Generated {len(config_paths)} cfg files and Slurm job array script:")
-    for p in config_paths: print("  ", p.relative_to(repo_root))
-    print("  ", (jobs_dir / 'train_models.sbatch').relative_to(repo_root))
+    for p in config_paths:
+        print("  ", p.relative_to(repo_root))
+    print("  ", (jobs_dir / "train_models.sbatch").relative_to(repo_root))
 
 
 if __name__ == "__main__":
