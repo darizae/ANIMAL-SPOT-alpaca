@@ -1,0 +1,28 @@
+{
+  "active_variants": ["seq400_baseline"],
+
+  "globals": {
+    "src_dir": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT",
+    "data_root": "/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data",
+    "dataset": "training_corpus_v1/dataset_random_by_clip",
+    "runs_root": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/runs",
+    "slurm": {
+      "partition": "kisski",
+      "gpus": "A100:2",
+      "cpus": 8,
+      "nodes": 1,
+      "time": "00:45:00",
+      "account": "kisski-dpz-alpaca-hum"
+    }
+  },
+
+  "variants": {
+    "seq400_baseline": {
+      "sequence_len": 400,
+      "n_fft": 2048,
+      "hop_length": 1024,
+      "batch_size": 16,
+      "early_stopping_patience_epochs": 10
+    }
+  }
+}
