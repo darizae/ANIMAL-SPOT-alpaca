@@ -8,6 +8,8 @@ Result:
 """
 
 from __future__ import annotations
+
+import argparse
 import json, shutil, textwrap, os
 from datetime import datetime
 from pathlib import Path
@@ -21,19 +23,19 @@ TEMPLATE_CFG = textwrap.dedent("""\
     checkpoint_dir={run_dir}/checkpoints
     log_dir={run_dir}/logs
     summary_dir={run_dir}/summaries
-    noise_dir=
+    noise_dir=None
     start_from_scratch=true
-    max_train_epochs={max_train_epochs}
+    max_train_epochs=40        
     jit_save=false
     epochs_per_eval=2
-    batch_size={batch_size}
+    batch_size=16              
     num_workers=0
-    no_cuda=true
+    no_cuda=false
     lr=1e-5
     beta1=0.5
     lr_patience_epochs=8
     lr_decay_factor=0.5
-    early_stopping_patience_epochs={early_stopping_patience_epochs}
+    early_stopping_patience_epochs=10
     filter_broken_audio=false
     sequence_len={sequence_len}
     freq_compression=linear
@@ -77,33 +79,33 @@ python {repo_root}/TRAINING/start_training.py "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}
 
 
 def main():
-    # Hardcoded path to JSON config
-    json_path = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/tools/train_variants.json")
-    cfg = json.loads(json_path.read_text())
+    p = argparse.ArgumentParser()
+    p.add_argument("json", type=Path)
+    args = p.parse_args()
 
-    repo_root = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca")
+    cfg = json.loads(args.json.read_text())
+    repo_root = Path(__file__).resolve().parents[2]
     runs_root = Path(cfg["globals"]["runs_root"])
-    (runs_root / "job_logs").mkdir(parents=True, exist_ok=True)
+    runs_root.joinpath("job_logs").mkdir(parents=True, exist_ok=True)
 
     config_paths = []
     for name in cfg["active_variants"]:
         v = cfg["variants"][name]
         g = cfg["globals"]
 
+        # dataset can now be variant-specific
+        dataset_sub = v.get("dataset", g.get("dataset"))
+        data_dir = f"{g['data_root']}/{dataset_sub}"
+
         run_dir = runs_root / f"models/{name}"
         cfg_dir = repo_root / "TRAINING" / "cfg" / name
         cfg_dir.mkdir(parents=True, exist_ok=True)
-
-        data_dir = f"{g['data_root']}/{g['dataset']}"
 
         filled = TEMPLATE_CFG.format(
             src_dir=g["src_dir"],
             data_dir=data_dir,
             runs_root=runs_root,
             run_dir=run_dir,
-            max_train_epochs=v.get("max_train_epochs", 40),
-            batch_size=v.get("batch_size", 16),
-            early_stopping_patience_epochs=v.get("early_stopping_patience_epochs", 10),
             sequence_len=v["sequence_len"],
             n_fft=v["n_fft"],
             hop_length=v["hop_length"],
