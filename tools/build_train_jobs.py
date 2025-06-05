@@ -9,9 +9,7 @@ Result:
 
 from __future__ import annotations
 
-import argparse
 import json, shutil, textwrap, os
-from datetime import datetime
 from pathlib import Path
 
 TEMPLATE_CFG = textwrap.dedent("""\
@@ -79,11 +77,9 @@ python {repo_root}/TRAINING/start_training.py "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}
 
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("json", type=Path)
-    args = p.parse_args()
-
-    cfg = json.loads(args.json.read_text())
+    # Hardcoded path to JSON config
+    json_path = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/tools/train_variants.json")
+    cfg = json.loads(json_path.read_text())
     repo_root = Path(__file__).resolve().parents[2]
     runs_root = Path(cfg["globals"]["runs_root"])
     runs_root.joinpath("job_logs").mkdir(parents=True, exist_ok=True)
