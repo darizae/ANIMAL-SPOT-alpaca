@@ -81,7 +81,7 @@ def main():
     json_path = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/tools/train_variants.json")
     cfg = json.loads(json_path.read_text())
 
-    repo_root = Path(__file__).resolve().parents[2]  # repos/ANIMAL-SPOT-alpaca
+    repo_root = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca")
     runs_root = Path(cfg["globals"]["runs_root"])
     (runs_root / "job_logs").mkdir(parents=True, exist_ok=True)
 
