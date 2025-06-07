@@ -108,12 +108,17 @@ class Spectrogram(object):
         self.center = center
         self.window = torch.hann_window(self.n_fft)
 
-    def __call__(self, y):
+    def __call__(self, y: torch.Tensor):
+        if y.shape[1] < self.n_fft:
+            pad = self.n_fft - y.shape[1]
+            y = torch.nn.functional.pad(y, (0, pad))
+
         if y.dim() != 2:
             raise ValueError(
                 "Spectrogram expects a 2 dimensional signal of size (c, n), "
                 "but got size: {}.".format(y.size())
             )
+        
         S = torch.stft(
             input=y,
             n_fft=self.n_fft,

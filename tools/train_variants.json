@@ -7,7 +7,7 @@
     "runs_root": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/runs",
 
     "slurm": { "partition": "kisski", "gpus": "A100:2",
-               "cpus": 8, "nodes": 1, "time": "00:45:00",
+               "cpus": 8, "nodes": 1, "time": "00:15:00",
                "account": "kisski-dpz-alpaca-hum" }
   },
 
