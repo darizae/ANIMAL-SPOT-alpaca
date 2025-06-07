@@ -1,5 +1,5 @@
 {
-  "active_variants": ["v1_random", "v2_quality"],
+  "active_variants": ["v1_random", "v2_quality", "v3_tape_proportional"],
 
   "globals": {
     "src_dir": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT",
