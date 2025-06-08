@@ -1,0 +1,5 @@
+[
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.60 },
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.70 },
+  { "seq_len": 0.40, "hop": 0.05, "threshold": 0.60 }
+]
