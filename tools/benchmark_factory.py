@@ -17,7 +17,7 @@ import argparse, json, textwrap
 from datetime import datetime
 from jinja2 import Template
 
-PRED_TMPL = Template(textwrap.dedent("""\
+PRED_TMPL = Template(textwrap.dedent("""
     ######################################################################
     #                    ANIMAL-SPOT PREDICTION CONFIG                   #
     ######################################################################
@@ -39,8 +39,8 @@ PRED_TMPL = Template(textwrap.dedent("""\
     input_file={{ input_dir }}
     """))
 
-EVAL_SBATCH_TMPL = Template("""\
-#!/bin/bash
+EVAL_SBATCH_TMPL = Template(
+    r"""#!/bin/bash
 #SBATCH --job-name=eval_{{ model }}
 #SBATCH --partition=kisski
 #SBATCH --nodes=1
@@ -61,8 +61,8 @@ CFG=( {{ cfgs|join(' ') }} )
 python EVALUATION/start_evaluation.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """)
 
-SBATCH_TMPL = Template(textwrap.dedent(r"""\
-    #!/bin/bash
+SBATCH_TMPL = Template(textwrap.dedent(
+    r"""#!/bin/bash
     #SBATCH --job-name=pred_{{ model_name }}
     #SBATCH --partition=kisski
     #SBATCH --nodes=1
@@ -97,9 +97,9 @@ def main(args):
 
     variants = json.loads(Path(args.variants_json).read_text())
     repo_root = Path(__file__).resolve().parents[1]
-    train_root = repo_root / "TRAINING"
+    bench_root = repo_root / "BENCHMARK"
     src_dir = repo_root / "ANIMAL-SPOT"
-    jobs_dir = train_root / "jobs"
+    jobs_dir = bench_root / "jobs"
 
     bench_root.mkdir(parents=True, exist_ok=True)
     (bench_root / "cfg").mkdir(exist_ok=True)
@@ -161,11 +161,11 @@ def main(args):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--training-root",  help="override training root if not on the HPC")
+    ap.add_argument("--training-root", help="override training root if not on the HPC")
     ap.add_argument("--benchmark-root", help="override benchmark root if not on the HPC")
-    ap.add_argument("--corpus-root",    required=True, help="benchmark corpus folder")
-    ap.add_argument("--variants-json",  required=True, help="JSON file with seq_len/hop/threshold triples")
-    ap.add_argument("--src-dir",        help="ANIMAL-SPOT source tree (override)")
+    ap.add_argument("--corpus-root", required=True, help="benchmark corpus folder")
+    ap.add_argument("--variants-json", required=True, help="JSON file with seq_len/hop/threshold triples")
+    ap.add_argument("--src-dir", help="ANIMAL-SPOT source tree (override)")
     ap.add_argument("--max-concurrent", type=int, default=10, help="array concurrency")
     args = ap.parse_args()
     main(args)
