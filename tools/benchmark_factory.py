@@ -30,7 +30,7 @@ PRED_TMPL = Template(textwrap.dedent("""\
     hop={{ hop }}
     threshold={{ threshold }}
     batch_size=1
-    num_workers=4
+    num_workers=1
     no_cuda=false
     visualize=false
     jit_load=false
@@ -39,15 +39,27 @@ PRED_TMPL = Template(textwrap.dedent("""\
     input_file={{ input_dir }}
     """))
 
-EVAL_TMPL = Template(textwrap.dedent("""\
-    ######################################################################
-    #                    ANIMAL-SPOT EVALUATION CONFIG                   #
-    ######################################################################
-    prediction_dir={{ out_root }}/prediction/output
-    output_dir={{ out_root }}/evaluation
-    threshold={{ threshold }}
-    noise_in_anno=false
-    """))
+EVAL_SBATCH_TMPL = Template("""\
+#!/bin/bash
+#SBATCH --job-name=eval_{{ model }}
+#SBATCH --partition=kisski
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=2
+#SBATCH --time=00:10:00
+#SBATCH --account=kisski-dpz-alpaca-hum
+#SBATCH --output={{ jobs_dir }}/job_logs/%x-%A_%a.out
+#SBATCH --error={{ jobs_dir }}/job_logs/%x-%A_%a.err
+#SBATCH -a 0-{{ n_cfgs_minus1 }}%{{ max_conc }}
+#SBATCH --chdir={{ repo_root }}
+
+export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
+eval "$(micromamba shell hook --shell=bash)"
+micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
+
+CFG=( {{ cfgs|join(' ') }} )
+python EVALUATION/start_evaluation.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
+""")
 
 SBATCH_TMPL = Template(textwrap.dedent(r"""\
     #!/bin/bash
@@ -84,7 +96,10 @@ def main(args):
     predict_in = corpus_root / "labelled_recordings_new"
 
     variants = json.loads(Path(args.variants_json).read_text())
-    src_dir = Path(args.src_dir or DEFAULT_SRC_DIR).resolve()
+    repo_root = Path(__file__).resolve().parents[1]
+    train_root = repo_root / "TRAINING"
+    src_dir = repo_root / "ANIMAL-SPOT"
+    jobs_dir = train_root / "jobs"
 
     bench_root.mkdir(parents=True, exist_ok=True)
     (bench_root / "cfg").mkdir(exist_ok=True)
@@ -93,7 +108,6 @@ def main(args):
     for model_pk in training_root.glob("runs/models/*/models/ANIMAL-SPOT.pk"):
         model_dir = model_pk.parent.parent  # .../vX_y/…
         model_name = model_dir.name
-        jobs_dir = bench_root / "jobs"
         cfg_paths = []
 
         for var in variants:
@@ -118,13 +132,13 @@ def main(args):
             cfg_paths.append(pred_cfg_path)
 
             # write evaluation cfg
-            eval_cfg = EVAL_TMPL.render(
+            eval_cfg = EVAL_SBATCH_TMPL.render(
                 out_root=out_root,
                 threshold=var['threshold']
             )
             (cfg_dir / "eval.cfg").write_text(eval_cfg)
 
-        # sbatch script
+        # sbatch array -------------------------------------------------
         sbatch = SBATCH_TMPL.render(
             model_name=model_name,
             n_jobs_minus1=len(cfg_paths) - 1,
@@ -133,9 +147,16 @@ def main(args):
             src_dir=src_dir,
             jobs_dir=jobs_dir
         )
-        sb_path = jobs_dir / f"predict_{model_name}.sbatch"
+        sb_path = jobs_dir / f"predict_{model_name}.batch"
         sb_path.write_text(sbatch)
-        print(f"📝  wrote {sb_path}  ({len(cfg_paths)} array jobs)")
+        print(f"📝 wrote {sb_path}  ({len(cfg_paths)} array jobs)")
+
+    all_batches = sorted(jobs_dir.glob("predict_*.batch"))
+    master = jobs_dir / "predict_models.batch"
+    with master.open("w") as fh:
+        for b in all_batches:
+            fh.write(f"sbatch {b}\n")
+    print(f"📝 wrote {master}  (launches {len(all_batches)} arrays)")
 
 
 if __name__ == "__main__":
