@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # ───── static cluster paths ────────────────────────────────────────────
-TRAINING=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING
-BENCHMARK=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/BENCHMARK
-SRC=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT
+ROOT=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca
+TRAINING=$ROOT/TRAINING
+BENCHMARK=$ROOT/BENCHMARK
+SRC=$ROOT/ANIMAL-SPOT
 ENV=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
 # ----------------------------------------------------------------------
 
@@ -16,12 +17,12 @@ CORPUS=$1          # e.g. $BENCHMARK/benchmark_corpus_v1
 VARJSON=$2         # json with seq_len/hop/threshold variants
 
 # ─── 1. generate cfgs + batch scripts ─────────────────────────────────
-python "$TRAINING/tools/benchmark_factory.py" \
+python "$ROOT/tools/benchmark_factory.py" \
        --corpus-root "$CORPUS" \
        --variants-json "$VARJSON"
 
 # ─── 2. submit the prediction arrays (one per model) ──────────────────
-PRED_MASTER="$BENCHMARK/jobs/predict_models.batch"
+PRED_MASTER="$TRAINING/jobs/predict_models.batch"
 sbatch "$PRED_MASTER"
 MASTER_JOB=$(squeue -u "$USER" -h -n predict_models.batch -o "%i")
 
