@@ -22,9 +22,9 @@ python "$ROOT/tools/benchmark_factory.py" \
        --variants-json "$VARJSON"
 
 # ─── 2. submit the prediction arrays (one per model) ──────────────────
-PRED_MASTER="$TRAINING/jobs/predict_models.batch"
+PRED_MASTER="$BENCHMARK/jobs/pred_models.batch"
 sbatch "$PRED_MASTER"
-MASTER_JOB=$(squeue -u "$USER" -h -n predict_models.batch -o "%i")
+MASTER_JOB=$(squeue -u "$USER" -h -n pred_models.batch -o "%i")
 
 echo "⏳ waiting for prediction arrays to finish (master job $MASTER_JOB)…"
 while squeue -h -j "$MASTER_JOB" &>/dev/null; do
