@@ -145,15 +145,15 @@ def main(args):
         (jobs_dir / f"pred_{model_name}.batch").write_text(pred_batch)
 
     # master launchers -------------------------------------------------
-    for kind in "pred":
-        batches = sorted(jobs_dir.glob(f"{kind}_*.batch"))
-        master = jobs_dir / f"{kind}_models.batch"
+    batches = sorted(jobs_dir.glob("pred_*.batch"))
+    master = jobs_dir / "pred_models.batch"
 
-        header = "#!/bin/bash\n"
-        body = "".join(f"sbatch {b}\n" for b in batches)
+    header = "#!/bin/bash\n"
+    body = "".join(f"sbatch {b}\n" for b in batches)
 
-        master.write_text(header + body)
-        print(f"📝 wrote {master}  ({len(batches)} arrays)")
+    master.write_text(header + body)
+    print(f"📝 wrote {master}  ({len(batches)} arrays)")
+
 
 
 if __name__ == "__main__":
