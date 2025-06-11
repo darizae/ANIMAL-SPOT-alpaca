@@ -75,13 +75,14 @@ python PREDICTION/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
 DEFAULT_TRAINING_ROOT = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING")
 DEFAULT_BENCHMARK_ROOT = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/BENCHMARK")
 DEFAULT_SRC_DIR = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT")
+CORPUS_BASE = Path("/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation")
 
 
 def main(args):
     repo_root = Path(__file__).resolve().parents[1]
     training_root = Path(args.training_root or DEFAULT_TRAINING_ROOT).resolve()
     bench_root = Path(args.benchmark_root or DEFAULT_BENCHMARK_ROOT).resolve()
-    corpus_root = Path(args.corpus_root).resolve()
+    corpus_root = (CORPUS_BASE / args.corpus_root).resolve()
     predict_in = corpus_root / "labelled_recordings_new"
 
     variants = json.loads(Path(args.variants_json).read_text())
