@@ -1,5 +1,9 @@
 [
-  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.60 },
-  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.70 },
-  { "seq_len": 0.40, "hop": 0.05, "threshold": 0.60 }
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.10 },
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.20 },
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.30 },
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.40 },
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.50 },
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.80 },
+  { "seq_len": 0.50, "hop": 0.05, "threshold": 0.90 }
 ]
