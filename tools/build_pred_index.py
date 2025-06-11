@@ -27,7 +27,7 @@ def parse_annotation(file_path: Path):
 def main(run_root: Path):
     entries = []
     uid = itertools.count(1)
-    for anno in run_root.glob("evaluation/*.annotation.result.txt"):
+    for anno in run_root.glob("evaluation/**/*.annotation.result.txt"):
         tape = anno.stem.split("_predict_output")[0] + ".wav"
         for beg, end in parse_annotation(anno):
             entries.append({
@@ -43,7 +43,7 @@ def main(run_root: Path):
         "n_preds": len(entries),
     }
     idx = {"meta": meta, "entries": entries}
-    (run_root / "index.json").write_text(json.dumps(idx, indent=2))
+    (run_root / "evaluation" / "index.json").write_text(json.dumps(idx, indent=2))
     print(f"✅ index with {len(entries)} preds → {run_root / 'index.json'}")
 
 
