@@ -59,8 +59,8 @@ PRED_BATCH_TMPL = Template(r"""#!/bin/bash
 #SBATCH --time=01:00:00
 #SBATCH --account=kisski-dpz-alpaca-hum
 #SBATCH --array=0-{{ n_cfgs_minus1 }}%{{ max_conc }}
-#SBATCH --output={{ jobs_dir }}/pred_%x-%j.out
-#SBATCH --error={{ jobs_dir }}/pred_%x-%j.err
+#SBATCH --output={{ jobs_dir }}/job_logs/pred_%x-%j.out
+#SBATCH --error={{ jobs_dir }}/job_logs/pred_%x-%j.err
 #SBATCH --chdir=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca
 
 export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
