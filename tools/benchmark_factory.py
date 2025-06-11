@@ -55,7 +55,6 @@ PRED_BATCH_TMPL = Template(r"""#!/bin/bash
 #SBATCH --ntasks-per-node=2
 #SBATCH --gpus-per-node=A100:2
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
 #SBATCH --constraint=80gb_vram
 #SBATCH --time=01:00:00
 #SBATCH --account=kisski-dpz-alpaca-hum
@@ -70,28 +69,6 @@ micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamb
 
 CFG=({% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
 python {{ src_dir }}/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
-""")
-
-EVAL_BATCH_TMPL = Template(r"""#!/bin/bash
-#SBATCH --job-name=eval_{{ model }}
-#SBATCH --partition=kisski
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
-#SBATCH --time=00:05:00
-#SBATCH --account=kisski-dpz-alpaca-hum
-#SBATCH --array=0-{{ n_cfgs_minus1 }}%{{ max_conc }}
-#SBATCH --output={{ jobs_dir }}/eval_%x-%j.out
-#SBATCH --error={{ jobs_dir }}/eval_%x-%j.err
-#SBATCH --chdir=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca
-
-export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
-eval "$(micromamba shell hook --shell=bash)"
-micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
-
-CFG=({% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
-python EVALUATION/start_evaluation.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """)
 
 # ───────────────────── default roots on the HPC ─────────────────────
@@ -167,17 +144,8 @@ def main(args):
         )
         (jobs_dir / f"pred_{model_name}.batch").write_text(pred_batch)
 
-        eval_batch = EVAL_BATCH_TMPL.render(
-            model=model_name,
-            n_cfgs_minus1=len(eval_cfgs) - 1,
-            max_conc=args.max_concurrent,
-            cfgs=[str(p) for p in eval_cfgs],
-            jobs_dir=jobs_dir,
-        )
-        (jobs_dir / f"eval_{model_name}.batch").write_text(eval_batch)
-
     # master launchers -------------------------------------------------
-    for kind in ("pred", "eval"):
+    for kind in "pred":
         batches = sorted(jobs_dir.glob(f"{kind}_*.batch"))
         master = jobs_dir / f"{kind}_models.batch"
 
