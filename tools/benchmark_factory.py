@@ -68,7 +68,7 @@ eval "$(micromamba shell hook --shell=bash)"
 micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
 
 CFG=({% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
-python {{ src_dir }}/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
+python PREDICTION/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """)
 
 # ───────────────────── default roots on the HPC ─────────────────────
