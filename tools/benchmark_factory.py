@@ -6,8 +6,6 @@ for every trained model and every benchmark-variant.
 Usage
 -----
 python tools/benchmark_factory.py \
-       --benchmark-root BENCHMARK \
-       --training-root  TRAINING \
        --corpus-root    data/benchmark_corpus_v1 \
        --variants-json  tools/benchmark_variants.json
 """
@@ -17,7 +15,8 @@ import argparse, json, textwrap
 from datetime import datetime
 from jinja2 import Template
 
-PRED_TMPL = Template(textwrap.dedent("""
+# ───────────────────── templates ────────────────────────────────────
+PRED_TMPL = Template(textwrap.dedent("""\
     ######################################################################
     #                    ANIMAL-SPOT PREDICTION CONFIG                   #
     ######################################################################
@@ -36,136 +35,162 @@ PRED_TMPL = Template(textwrap.dedent("""
     jit_load=false
     min_max_norm=true
     latent_extract=false
-    input_file={{ input_dir }}
+    input_file={{ predict_in }}
     """))
 
-EVAL_SBATCH_TMPL = Template(
-    r"""#!/bin/bash
-#SBATCH --job-name=eval_{{ model }}
+EVAL_CFG_TMPL = Template(textwrap.dedent("""\
+    ######################################################################
+    #                    ANIMAL-SPOT EVALUATION CONFIG                   #
+    ######################################################################
+    prediction_dir={{ out_root }}/prediction/output
+    output_dir={{ out_root }}/evaluation/annotations
+    threshold={{ threshold }}
+    noise_in_anno=false
+    """))
+
+PRED_BATCH_TMPL = Template(r"""#!/bin/bash
+#SBATCH --job-name=pred_{{ model }}
 #SBATCH --partition=kisski
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=2
-#SBATCH --time=00:10:00
+#SBATCH --ntasks-per-node=2
+#SBATCH --gpus-per-node=A100:2
+#SBATCH --cpus-per-task=8
+#SBATCH --constraint=80gb_vram
+#SBATCH --time=02:20:00
 #SBATCH --account=kisski-dpz-alpaca-hum
-#SBATCH --output={{ jobs_dir }}/job_logs/%x-%A_%a.out
-#SBATCH --error={{ jobs_dir }}/job_logs/%x-%A_%a.err
-#SBATCH -a 0-{{ n_cfgs_minus1 }}%{{ max_conc }}
-#SBATCH --chdir={{ repo_root }}
+#SBATCH --output={{ jobs_dir }}/pred_%x-%j.out
+#SBATCH --error={{ jobs_dir }}/pred_%x-%j.err
+#SBATCH --chdir=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca
 
 export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
 eval "$(micromamba shell hook --shell=bash)"
 micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
 
-CFG=( {{ cfgs|join(' ') }} )
+CFG=({% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
+python {{ src_dir }}/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
+""")
+
+EVAL_BATCH_TMPL = Template(r"""#!/bin/bash
+#SBATCH --job-name=eval_{{ model }}
+#SBATCH --partition=kisski
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=00:05:00
+#SBATCH --account=kisski-dpz-alpaca-hum
+#SBATCH --array=0-{{ n_cfgs_minus1 }}%{{ max_conc }}
+#SBATCH --output={{ jobs_dir }}/eval_%x-%j.out
+#SBATCH --error={{ jobs_dir }}/eval_%x-%j.err
+#SBATCH --chdir=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca
+
+export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
+eval "$(micromamba shell hook --shell=bash)"
+micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
+
+CFG=({% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
 python EVALUATION/start_evaluation.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """)
 
-SBATCH_TMPL = Template(textwrap.dedent(
-    r"""#!/bin/bash
-    #SBATCH --job-name=pred_{{ model_name }}
-    #SBATCH --partition=kisski
-    #SBATCH --nodes=1
-    #SBATCH --ntasks=1
-    #SBATCH --gpus=1
-    #SBATCH --cpus-per-task=8
-    #SBATCH --time=01:00:00
-    #SBATCH --account=kisski-dpz-alpaca-hum
-    #SBATCH --array=0-{{ n_jobs_minus1 }}%{{ max_conc }}
-    #SBATCH --output={{ jobs_dir }}/pred_%A_%a.out
-    #SBATCH --error={{ jobs_dir }}/pred_%A_%a.err
-
-    module load cuda/12
-    source ~/miniconda3/etc/profile.d/conda.sh
-    conda activate animal-spot
-
-    CFG=({% for c in cfg_paths %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
-    python {{ src_dir }}/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
-    """))
-
-# ── cluster-wide defaults ─────────────────────────────────────────────
+# ───────────────────── default roots on the HPC ─────────────────────
 DEFAULT_TRAINING_ROOT = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING")
 DEFAULT_BENCHMARK_ROOT = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/BENCHMARK")
 DEFAULT_SRC_DIR = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT")
 
 
 def main(args):
+    repo_root = Path(__file__).resolve().parents[1]
     training_root = Path(args.training_root or DEFAULT_TRAINING_ROOT).resolve()
     bench_root = Path(args.benchmark_root or DEFAULT_BENCHMARK_ROOT).resolve()
     corpus_root = Path(args.corpus_root).resolve()
     predict_in = corpus_root / "labelled_recordings_new"
 
     variants = json.loads(Path(args.variants_json).read_text())
-    repo_root = Path(__file__).resolve().parents[1]
-    bench_root = repo_root / "BENCHMARK"
-    src_dir = repo_root / "ANIMAL-SPOT"
+    src_dir = Path(args.src_dir or DEFAULT_SRC_DIR).resolve()
+
+    # create base folders
+    (bench_root / "cfg").mkdir(parents=True, exist_ok=True)
     jobs_dir = bench_root / "jobs"
+    jobs_dir.mkdir(exist_ok=True)
+    (jobs_dir / "job_logs").mkdir(exist_ok=True)
 
-    bench_root.mkdir(parents=True, exist_ok=True)
-    (bench_root / "cfg").mkdir(exist_ok=True)
-    (bench_root / "jobs").mkdir(exist_ok=True)
-
+    # ───────── iterate over all trained models ───────────────────────
     for model_pk in training_root.glob("runs/models/*/models/ANIMAL-SPOT.pk"):
-        model_dir = model_pk.parent.parent  # .../vX_y/…
+        model_dir = model_pk.parent.parent  # …/vX_*/…
         model_name = model_dir.name
-        cfg_paths = []
+
+        pred_cfgs, eval_cfgs = [], []
 
         for var in variants:
             tag = f"len{int(var['seq_len'] * 1000):03d}_hop{int(var['hop'] * 1000):03d}_th{int(var['threshold'] * 100):02d}"
             out_root = bench_root / "runs" / model_name / tag
             cfg_dir = bench_root / "cfg" / model_name / tag
-            cfg_dir.mkdir(parents=True, exist_ok=True)
             (out_root / "prediction").mkdir(parents=True, exist_ok=True)
+            (cfg_dir).mkdir(parents=True, exist_ok=True)
 
-            # write prediction cfg
-            pred_cfg = PRED_TMPL.render(
-                src_dir=src_dir,
-                model_path=model_pk,
-                out_root=out_root,
-                seq_len=var['seq_len'],
-                hop=var['hop'],
-                threshold=var['threshold'],
-                input_dir=predict_in
-            )
+            # PREDICTION cfg
             pred_cfg_path = cfg_dir / "predict.cfg"
-            pred_cfg_path.write_text(pred_cfg)
-            cfg_paths.append(pred_cfg_path)
-
-            # write evaluation cfg
-            eval_cfg = EVAL_SBATCH_TMPL.render(
-                out_root=out_root,
-                threshold=var['threshold']
+            pred_cfg_path.write_text(
+                PRED_TMPL.render(
+                    src_dir=src_dir,
+                    model_path=model_pk,
+                    out_root=out_root,
+                    seq_len=var['seq_len'],
+                    hop=var['hop'],
+                    threshold=var['threshold'],
+                    predict_in=predict_in,
+                )
             )
-            (cfg_dir / "eval.cfg").write_text(eval_cfg)
+            pred_cfgs.append(pred_cfg_path)
 
-        # sbatch array -------------------------------------------------
-        sbatch = SBATCH_TMPL.render(
-            model_name=model_name,
-            n_jobs_minus1=len(cfg_paths) - 1,
+            # EVALUATION cfg
+            eval_cfg_path = cfg_dir / "eval.cfg"
+            (out_root / "evaluation").mkdir(parents=True, exist_ok=True)
+            eval_cfg_path.write_text(
+                EVAL_CFG_TMPL.render(
+                    out_root=out_root,
+                    threshold=var['threshold']
+                )
+            )
+            eval_cfgs.append(eval_cfg_path)
+
+        # ─── batch-files per model ───────────────────────────────────
+        pred_batch = PRED_BATCH_TMPL.render(
+            model=model_name,
+            n_cfgs_minus1=len(pred_cfgs) - 1,
             max_conc=args.max_concurrent,
-            cfg_paths=[str(p) for p in cfg_paths],
+            cfgs=[str(p) for p in pred_cfgs],
             src_dir=src_dir,
-            jobs_dir=jobs_dir
+            jobs_dir=jobs_dir,
         )
-        sb_path = jobs_dir / f"predict_{model_name}.batch"
-        sb_path.write_text(sbatch)
-        print(f"📝 wrote {sb_path}  ({len(cfg_paths)} array jobs)")
+        (jobs_dir / f"pred_{model_name}.batch").write_text(pred_batch)
 
-    all_batches = sorted(jobs_dir.glob("predict_*.batch"))
-    master = jobs_dir / "predict_models.batch"
-    with master.open("w") as fh:
-        for b in all_batches:
-            fh.write(f"sbatch {b}\n")
-    print(f"📝 wrote {master}  (launches {len(all_batches)} arrays)")
+        eval_batch = EVAL_BATCH_TMPL.render(
+            model=model_name,
+            n_cfgs_minus1=len(eval_cfgs) - 1,
+            max_conc=args.max_concurrent,
+            cfgs=[str(p) for p in eval_cfgs],
+            jobs_dir=jobs_dir,
+        )
+        (jobs_dir / f"eval_{model_name}.batch").write_text(eval_batch)
 
+    # master launchers -------------------------------------------------
+    for kind in ("pred", "eval"):
+        batches = sorted(jobs_dir.glob(f"{kind}_*.batch"))
+        master  = jobs_dir / f"{kind}_models.batch"
+
+        header  = "#!/bin/bash\n"
+        body    = "".join(f"sbatch {b}\n" for b in batches)
+
+        master.write_text(header + body)
+        print(f"📝 wrote {master}  ({len(batches)} arrays)")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--training-root", help="override training root if not on the HPC")
-    ap.add_argument("--benchmark-root", help="override benchmark root if not on the HPC")
-    ap.add_argument("--corpus-root", required=True, help="benchmark corpus folder")
+    ap.add_argument("--training-root", help="Path to TRAINING root (HPC default hard-coded otherwise)")
+    ap.add_argument("--benchmark-root", help="Path to BENCHMARK root (HPC default hard-coded otherwise)")
+    ap.add_argument("--corpus-root", required=True, help="Benchmark corpus folder")
     ap.add_argument("--variants-json", required=True, help="JSON file with seq_len/hop/threshold triples")
-    ap.add_argument("--src-dir", help="ANIMAL-SPOT source tree (override)")
-    ap.add_argument("--max-concurrent", type=int, default=10, help="array concurrency")
+    ap.add_argument("--src-dir", help="Override ANIMAL-SPOT source directory")
+    ap.add_argument("--max-concurrent", type=int, default=10, help="Max simultaneous tasks in an array")
     args = ap.parse_args()
     main(args)

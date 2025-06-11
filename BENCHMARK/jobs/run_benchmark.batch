@@ -1,0 +1,41 @@
+#!/bin/bash
+#SBATCH --job-name=run_benchmark
+#SBATCH --partition=kisski
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=00:01:00
+#SBATCH --account=kisski-dpz-alpaca-hum
+#SBATCH --output=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/BENCHMARK/jobs/run_benchmark_%j.out
+#SBATCH --error=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/BENCHMARK/jobs/run_benchmark_%j.err
+#SBATCH --chdir=/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca
+
+###############################################################################
+# Positional parameters
+#   $1  → path to benchmark corpus root
+#   $2  → path to benchmark_variants.json
+###############################################################################
+CORPUS_ROOT="$1"
+VARIANTS_JSON="$2"
+
+if [[ -z "$CORPUS_ROOT" || -z "$VARIANTS_JSON" ]]; then
+  echo "Usage: sbatch run_benchmark.batch <corpus_root> <variants_json>"
+  exit 1
+fi
+
+# ── Activate env ──────────────────────────────────────────────────────────────
+export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
+eval "$(micromamba shell hook --shell=bash)"
+micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
+
+# ── Generate configs + batch files ───────────────────────────────────────────
+python tools/benchmark_factory.py \
+       --corpus-root  "$CORPUS_ROOT" \
+       --variants-json "$VARIANTS_JSON"
+
+# ── Submit the prediction arrays ─────────────────────────────────────────────
+PRED_JOBID=$(sbatch BENCHMARK/jobs/pred_models.batch | awk '{print $4}')
+echo "Submitted prediction arrays as job $PRED_JOBID"
+
+# ── Submit evaluation arrays after predictions succeed ───────────────────────
+sbatch --dependency=afterok:${PRED_JOBID} BENCHMARK/jobs/eval_models.batch
