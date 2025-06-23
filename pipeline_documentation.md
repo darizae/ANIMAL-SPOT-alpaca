@@ -61,7 +61,7 @@ Creates:
 ```bash
 cd ~/repos/ANIMAL-SPOT-alpaca
 
-python tools/training_factory.py tools/train_variants.json
+python tools/training_factory.py
 ```
 
 Creates:
@@ -131,6 +131,20 @@ Creates:
 * `BENCHMARK/cfg/…/predict.cfg` + `eval.cfg`
 * `BENCHMARK/jobs/pred_<model>.batch`
 * `BENCHMARK/jobs/pred_models.batch`
+
+Each variant in `benchmark_variants.json` defines:
+
+* `seq_len`: size of the spectrogram window in seconds (e.g., 0.40)
+* `hop`: stride between spectrogram windows in seconds (e.g., 0.05)
+* `threshold`: prediction probability threshold for classifying presence (e.g., 0.30)
+
+Each combination of model × variant produces:
+
+* One `predict.cfg` (GPU-based)
+* One `eval.cfg` (CPU-based)
+* Config-specific run directory for outputs
+
+Global job parameters such as partition, GPU/CPU count, memory, and account are specified in the Slurm template embedded in the Python script.
 
 ---
 
