@@ -2,9 +2,9 @@
 
 ### 🎯 Strategy
 
-1. **GPU nodes** for the heavy prediction arrays.
+1. **GPU nodes** for the heavy training and prediction jobs.
 2. **CPU nodes (scc-cpu)** for the evaluation arrays — no GPU hours wasted.
-3. **Two factory scripts** generate all batch files (`benchmark_factory.py` → GPU, `eval_factory.py` → CPU).
+3. **Factory scripts** generate all batch files for training, prediction, and evaluation.
 4. Each Slurm array is self-contained; you can debug or re-run any part independently.
 
 ---
@@ -13,6 +13,7 @@
 
 | Step | What happens                                                    | Where         | Tool / Command                                                                |
 | ---- | --------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------- |
+| -1   | Build **training datasets** for ANIMAL-SPOT                     | login         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]` |
 | 0    | Generate **training** configs & job array script                | login         | `python tools/training_factory.py` (symlink to training script)               |
 | 1    | Submit training jobs (GPU)                                      | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                      |
 | 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files | login         | `python tools/benchmark_factory.py …`                                         |
@@ -34,12 +35,33 @@ micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamb
 
 ## 🗒 Workflow in Detail
 
+### -1️⃣  Prepare training datasets
+
+```bash
+cd ~/repos/ANIMAL-SPOT-alpaca
+
+# Default use (includes noise mining + Raven selection tables)
+python data_preprocessing/prepare_datasets.py data/training_corpus_v1
+
+# Optional: add PNG spectrograms per clip
+python data_preprocessing/prepare_datasets.py data/training_corpus_v1 --generate_spectrograms
+```
+
+Creates:
+
+* `dataset_<variant>/train.csv`, `val.csv`, `test.csv`
+* `variant_index.json` with full metadata (for traceability)
+* `selection_tables/` — Raven-compatible `.txt` for all target clips
+* `spectrograms/` (optional) — PNGs aligned with the WAVs
+
+---
+
 ### 0️⃣  Build training configs and Slurm array
 
 ```bash
 cd ~/repos/ANIMAL-SPOT-alpaca
 
-python tools/training_factory.py
+python tools/training_factory.py tools/train_variants.json
 ```
 
 Creates:
@@ -53,7 +75,7 @@ Creates:
 ### 1️⃣  Launch training array (GPU)
 
 ```bash
-bash TRAINING/jobs/train_models.sbatch
+sbatch TRAINING/jobs/train_models.sbatch
 watch -n 1 squeue -u $USER
 ```
 
@@ -117,20 +139,18 @@ bash BENCHMARK/jobs/eval_models.batch
 Each array task:
 
 1. Calls `EVALUATION/start_evaluation.py <cfg>`
-
-2. Derives the matching `run_root` safely:
+2. Derives the matching `run_root`:
 
    ```bash
    RUN_ROOT=${CFG/cfg/runs}
    RUN_ROOT=${RUN_ROOT%/eval.cfg}
    python tools/build_pred_index.py "$RUN_ROOT"
    ```
-
-3. Writes `evaluation/index.json`.
+3. Writes `evaluation/index.json`
 
 ---
 
-### 5️⃣  Visualise results
+### 6️⃣  Visualise results
 
 ```bash
 python tools/evaluate_benchmark.py \
@@ -145,8 +165,9 @@ jupyter lab tools/metrics_analysis.py
 
 ## 🪪  Pre-run Checklist
 
-* ✅ Corpus & `variants.json` present
-* ✅ Old `BENCHMARK/{cfg,jobs,runs}` purged if you want a fresh slate
+* ✅ `corpus_index.json` present
+* ✅ `train_variants.json` & `benchmark_variants.json` configured
+* ✅ Purge old benchmark data if needed:
 
 ```bash
 rm -rf BENCHMARK/cfg/* BENCHMARK/jobs/* BENCHMARK/runs/*
