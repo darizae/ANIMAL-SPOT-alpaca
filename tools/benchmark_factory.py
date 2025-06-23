@@ -83,7 +83,7 @@ def main(args):
     bench_root = Path(args.benchmark_root or DEFAULT_BENCHMARK_ROOT).resolve()
     corpus_base = Path(args.corpus_base).resolve()
     corpus_root = (corpus_base / args.corpus_root).resolve()
-    predict_in = corpus_root / "labelled_recordings_new"
+    predict_in = corpus_root / "labelled_recordings"
 
     variants = json.loads(Path(args.variants_json).read_text())
     src_dir = Path(args.src_dir or DEFAULT_SRC_DIR).resolve()
