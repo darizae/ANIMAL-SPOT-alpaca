@@ -70,12 +70,35 @@ Creates:
 * `TRAINING/jobs/train_models.sbatch` — calls `start_training.py` via Slurm array
 * One config per variant from `tools/train_variants.json`
 
+Each variant in `train_variants.json` defines:
+
+* `dataset`: path to the dataset variant (under `data_root`)
+* `sequence_len`: time window in miliseconds. Padded or cut based on entry duration (for example 400)
+* `n_fft`, `hop_length`: spectrogram parameters used at training time
+
+Example entry:
+```json
+"v3_tape_proportional": {
+  "dataset": "training_corpus_v1/dataset_proportional_by_tape",
+  "sequence_len": 400,
+  "n_fft": 2048,
+  "hop_length": 1024
+}
+```
+
+Global settings are inherited from the `globals` block:
+
+* `src_dir`, `data_root`, `runs_root` → absolute paths
+* `slurm` block configures GPUs, CPUs, partition, walltime, and Slurm account.
+
+The `active_variants` list determines which variants will be built into configs and jobs.
+
 ---
 
 ### 1️⃣  Launch training array (GPU)
 
 ```bash
-sbatch TRAINING/jobs/train_models.sbatch
+bash TRAINING/jobs/train_models.sbatch
 watch -n 1 squeue -u $USER
 ```
 
