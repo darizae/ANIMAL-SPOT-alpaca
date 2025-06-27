@@ -64,6 +64,22 @@ Noise clips are mined from the same 15-minute clips as the hums, avoiding overla
 
 To ensure dataset integrity, a post-check identifies **overlapping or duplicate noise clips** per tape. Overlaps are uncommon, and exact duplicates are rarer still — but the check helps track edge cases when many clips are densely packed.
 
+#### 🎲 Seeds and reproducibility
+
+Each strategy includes a `seed` value to ensure deterministic shuffling and noise mining. Using the same seed always yields the same split and noise placement — essential for reproducibility.
+
+**Recommended naming strategy** for choosing seeds:
+
+| Variant Name                    | Chosen Seed |
+| ------------------------------- | ----------- |
+| `random`                        | 42          |
+| `random_more_noise`             | 43          |
+| `quality_balanced`              | 911         |
+| `clipwise_balanced`             | 1401        |
+| `quality_and_clipwise_balanced` | 2048        |
+
+This makes variant tracking intuitive and repeatable.
+
 ---
 
 After building, verify stats using:
