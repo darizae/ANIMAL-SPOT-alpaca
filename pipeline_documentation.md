@@ -102,13 +102,23 @@ Creates:
 
 * `TRAINING/cfg/<variant>/alpaca_server.cfg`
 * `TRAINING/jobs/train_models.sbatch` — calls `start_training.py` via Slurm array
-* One config per variant from `tools/train_variants.json`
+* One config per dataset variant found in `data_root/training_corpus_v1/dataset_*`
 
-Each variant in `train_variants.json` defines:
+Each training variant is auto-generated based on the folders found under:
 
-* `dataset`: path to the dataset variant (under `data_root`)
-* `sequence_len`: time window in miliseconds. Padded or cut based on entry duration (for example 400)
-* `n_fft`, `hop_length`: spectrogram parameters used at training time
+```bash
+/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data/training_corpus_v1
+```
+
+(You can override this path using `--data_root`)
+
+Each `alpaca_server.cfg` uses the **global training parameters** defined in `tools/train_variants.json`:
+
+* `sequence_len`: time window in milliseconds (e.g., 400). Audio clips are padded or cropped accordingly.
+* `n_fft`, `hop_length`: spectrogram parameters used at training time.
+* `slurm`: job scheduling parameters for the training array.
+
+Variant names are generated as `v1_<name>`, `v2_<name>`, etc., in lexicographical order of the dataset folders.
 
 Example entry:
 ```json
@@ -132,11 +142,11 @@ The `active_variants` list determines which variants will be built into configs 
 ### 1️⃣  Launch training array (GPU)
 
 ```bash
-bash TRAINING/jobs/train_models.sbatch
+sbtach TRAINING/jobs/train_models.sbatch
 watch -n 1 squeue -u $USER
 ```
 
-Each task runs:
+Each task automatically runs:
 
 ```bash
 python TRAINING/start_training.py <cfg_path>

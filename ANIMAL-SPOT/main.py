@@ -412,7 +412,7 @@ if __name__ == "__main__":
 
     split_fracs = {"train": .7, "val": .15, "test": .15}
     input_data = DatabaseCsvSplit(
-        split_fracs, working_dir=ARGS.data_dir, split_per_dir=True
+        split_fracs, working_dir=ARGS.data_dir, split_per_dir=False
     )
 
     audio_files = get_audio_files()
