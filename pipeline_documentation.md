@@ -11,16 +11,16 @@
 
 ## 🧱 Components
 
-| Step | What happens                                                    | Where         | Tool / Command                                                                |
-| ---- | --------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------- |
-| -1   | Build **training datasets** for ANIMAL-SPOT                     | login         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]` |
-| 0    | Generate **training** configs & job array script                | login         | `python tools/training_factory.py` (symlink to training script)               |
-| 1    | Submit training jobs (GPU)                                      | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                      |
-| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files | login         | `python tools/benchmark_factory.py …`                                         |
-| 3    | Submit prediction arrays                                        | login → Slurm | `bash BENCHMARK/jobs/pred_models.batch`                                       |
-| 4    | Generate **CPU evaluation** job arrays                          | login         | `python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20` |
-| 5    | Submit evaluation arrays                                        | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                       |
-| 6    | Jupyter insight notebook                                        | laptop/login  | `jupyter lab tools/metrics_analysis.py`                                       |
+| Step | What happens                                                    | Where         | Tool / Command                                                                     | Repository          |
+|------|-----------------------------------------------------------------|---------------|------------------------------------------------------------------------------------|---------------------|
+| -1   | Build **training datasets** for ANIMAL-SPOT                     | local         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]` | alpaca-segmentation |
+| 0    | Generate **training** configs & job array script                | login         | `python tools/training_factory.py` (symlink to training script)                    | ANIMAL-SPOT-alpaca  |
+| 1    | Submit training jobs (GPU)                                      | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                           | ANIMAL-SPOT-alpaca  |
+| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files | login         | `python tools/benchmark_factory.py …`                                              | ANIMAL-SPOT-alpaca  |
+| 3    | Submit prediction arrays                                        | login → Slurm | `bash BENCHMARK/jobs/pred_models.batch`                                            | ANIMAL-SPOT-alpaca  |
+| 4    | Generate **CPU evaluation** job arrays                          | login         | `python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20`      | ANIMAL-SPOT-alpaca  |
+| 5    | Submit evaluation arrays                                        | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                            | ANIMAL-SPOT-alpaca  |
+| 6    | Jupyter insight notebook                                        | local         | `jupyter lab tools/metrics_analysis.py`                                            | alpaca-segmentation |
 
 ---
 
@@ -53,6 +53,24 @@ Creates:
 * `variant_index.json` with full metadata (for traceability)
 * `selection_tables/` — Raven-compatible `.txt` for all target clips
 * `spectrograms/` (optional) — PNGs aligned with the WAVs
+
+---
+
+Each dataset variant is defined in `dataset_prep_configs.json`. The script builds all listed `active_strategies` automatically.
+
+#### 🔁 Noise mining: fallback and overlap
+
+Noise clips are mined from the same 15-minute clips as the hums, avoiding overlap via a `margin_s` parameter (e.g. 0.1s). If no free slot is found and `fallback_raw: true` is set, the script will **attempt to fall back** to the full raw file (not just the extract). This is rare in practice — tapes are usually long enough to avoid it. The script reports whether fallback was **actually used** at the end of the build.
+
+To ensure dataset integrity, a post-check identifies **overlapping or duplicate noise clips** per tape. Overlaps are uncommon, and exact duplicates are rarer still — but the check helps track edge cases when many clips are densely packed.
+
+---
+
+After building, verify stats using:
+
+```bash
+python data_preprocessing/count_dataset_files.py
+```
 
 ---
 
@@ -189,13 +207,21 @@ Each array task:
 
 ### 6️⃣  Visualise results
 
+Before running the evaluation script, pull the results of the **EVALUATION** step (index files, selection tables, etc.):
+
+```bash
+bash tools/pull_runs.sh
+```
+
+Then compute metrics and launch the analysis notebook
+
 ```bash
 python tools/evaluate_benchmark.py \
   --gt data/benchmark_corpus_v1/corpus_index.json \
   --runs BENCHMARK/runs \
   --out metrics.csv
 
-jupyter lab tools/metrics_analysis.py
+jupyter lab tools/metrics_analysis.ipynb
 ```
 
 ---
