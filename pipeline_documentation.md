@@ -226,7 +226,7 @@ Each array task:
 Before running the evaluation script, pull the results of the **EVALUATION** step (index files, selection tables, etc.):
 
 ```bash
-bash tools/pull_runs.sh
+bash data_preprocessing/pull_runs.sh
 ```
 
 Then compute metrics and launch the analysis notebook

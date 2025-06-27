@@ -9,7 +9,7 @@ Result:
 
 from __future__ import annotations
 
-import json, shutil, textwrap, os
+import json, shutil, textwrap, os, argparse
 from pathlib import Path
 
 TEMPLATE_CFG = textwrap.dedent("""\
@@ -77,24 +77,30 @@ python {repo_root}/TRAINING/start_training.py "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}
 
 
 def main():
-    # Hardcoded path to JSON config
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_root", type=Path, default=Path(
+        "/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data/training_corpus_v1"),
+                        help="Root path containing dataset_<variant> folders")
+    args = parser.parse_args()
+
     json_path = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/tools/train_variants.json")
     cfg = json.loads(json_path.read_text())
+    g = cfg["globals"]
+
     repo_root = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca")
-    runs_root = Path(cfg["globals"]["runs_root"])
+    runs_root = Path(g["runs_root"])
     runs_root.joinpath("job_logs").mkdir(parents=True, exist_ok=True)
 
+    # scan for datasets
+    dataset_folders = sorted([p for p in args.data_root.iterdir() if p.is_dir() and p.name.startswith("dataset_")])
     config_paths = []
-    for name in cfg["active_variants"]:
-        v = cfg["variants"][name]
-        g = cfg["globals"]
 
-        # dataset can now be variant-specific
-        dataset_sub = v.get("dataset", g.get("dataset"))
-        data_dir = f"{g['data_root']}/{dataset_sub}"
+    for idx, dataset_dir in enumerate(dataset_folders, start=1):
+        variant_name = f"v{idx}_{dataset_dir.name.replace('dataset_', '')}"
+        data_dir = dataset_dir
 
-        run_dir = runs_root / f"models/{name}"
-        cfg_dir = repo_root / "TRAINING" / "cfg" / name
+        run_dir = runs_root / f"models/{variant_name}"
+        cfg_dir = repo_root / "TRAINING" / "cfg" / variant_name
         cfg_dir.mkdir(parents=True, exist_ok=True)
 
         filled = TEMPLATE_CFG.format(
@@ -102,16 +108,16 @@ def main():
             data_dir=data_dir,
             runs_root=runs_root,
             run_dir=run_dir,
-            sequence_len=v["sequence_len"],
-            n_fft=v["n_fft"],
-            hop_length=v["hop_length"],
+            sequence_len=g["sequence_len"],
+            n_fft=g["n_fft"],
+            hop_length=g["hop_length"],
         )
         cfg_path = cfg_dir / "alpaca_server.cfg"
         cfg_path.write_text(filled)
         config_paths.append(cfg_path)
 
-    # ---- build sbatch array script ----
-    sl = cfg["globals"]["slurm"]
+    # build sbatch array script
+    sl = g["slurm"]
     sbatch_txt = SBATCH_HEADER.format(
         partition=sl["partition"],
         nodes=sl["nodes"],

@@ -1,18 +1,12 @@
 {
-  "active_variants": [
-    "v1_random",
-    "v2_quality",
-    "v3_tape_proportional",
-    "v4_proportional_by_tape_corrected",
-    "v5_quality_balanced_corrected",
-    "v6_proportional_clipwise_by_tape",
-    "v7_quality_and_tape_balanced"
-  ],
-
   "globals": {
     "src_dir": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT",
-    "data_root": "/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data",
+    "data_root": "/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data/training_corpus_v1",
     "runs_root": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/runs",
+
+    "sequence_len": 400,
+    "n_fft": 2048,
+    "hop_length": 1024,
 
     "slurm": {
       "partition": "kisski",
@@ -21,57 +15,6 @@
       "nodes": 1,
       "time": "00:15:00",
       "account": "kisski-dpz-alpaca-hum"
-    }
-  },
-
-  "variants": {
-    "v1_random": {
-      "dataset": "training_corpus_v1/dataset_random_by_clip",
-      "sequence_len": 400,
-      "n_fft": 2048,
-      "hop_length": 1024
-    },
-
-    "v2_quality": {
-      "dataset": "training_corpus_v1/dataset_quality_balanced",
-      "sequence_len": 400,
-      "n_fft": 2048,
-      "hop_length": 1024
-    },
-
-    "v3_tape_proportional": {
-      "dataset": "training_corpus_v1/dataset_proportional_by_tape",
-      "sequence_len": 400,
-      "n_fft": 2048,
-      "hop_length": 1024
-    },
-
-    "v4_proportional_by_tape_corrected": {
-      "dataset": "training_corpus_v1/dataset_proportional_by_tape_corrected",
-      "sequence_len": 400,
-      "n_fft": 2048,
-      "hop_length": 1024
-    },
-
-    "v5_quality_balanced_corrected": {
-      "dataset": "training_corpus_v1/dataset_quality_balanced_corrected",
-      "sequence_len": 400,
-      "n_fft": 2048,
-      "hop_length": 1024
-    },
-
-    "v6_proportional_clipwise_by_tape": {
-      "dataset": "training_corpus_v1/dataset_proportional_clipwise_by_tape",
-      "sequence_len": 400,
-      "n_fft": 2048,
-      "hop_length": 1024
-    },
-
-    "v7_quality_and_tape_balanced": {
-      "dataset": "training_corpus_v1/dataset_quality_and_tape_balanced",
-      "sequence_len": 400,
-      "n_fft": 2048,
-      "hop_length": 1024
     }
   }
 }
