@@ -247,7 +247,7 @@ python tools/evaluate_benchmark.py \
   --runs BENCHMARK/runs \
   --out metrics.csv
 
-jupyter lab tools/metrics_analysis.ipynb
+jupyter lab data_postprocessing/metrics_analysis.ipynb
 ```
 
 ---
