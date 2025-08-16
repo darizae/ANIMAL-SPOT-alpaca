@@ -10,7 +10,8 @@ Last Access: 27.12.2022
 
 
 import os
-import re
+import math
+from typing import List, Tuple
 import ast
 import sys
 import logging
@@ -45,7 +46,7 @@ class setup_evaluator(object):
         self.hop = None
         self.data_opts = None
         self.needed_annotation_columns = ["Selection", "View", "Channel", "Begin time (s)", "End time (s)",
-                                          "Low Freq (Hz)", "High Freq (Hz)", "Sound type", "Comments"]
+                                          "Low Freq (Hz)", "High Freq (Hz)", "Sound type", "Comments", "CNN logit (mean)"]
     def init_logger(self):
         self.logger = logging.getLogger('training animal-spot')
         stream_handler = logging.StreamHandler()
@@ -310,11 +311,18 @@ class setup_evaluator(object):
         iterator = 1
         annotated_prediction_file = open(path_annotation_file, 'w')
         annotated_prediction_file.write("\t".join(self.needed_annotation_columns)+"\n")
-        for label, __, start, end, __ in annotation_data:
+        for label, __, start, end, cnn_logit_mean, __ in annotation_data:
             if label == "noise" and self.config_data.get("noise_in_anno") == None:
                 continue
             else:
-                annotated_prediction_file.write(str(iterator)+"\tSpectrogram_1\t1\t"+str(start)+"\t"+str(end)+"\t"+str(self.data_opts.get("fmin"))+"\t"+str(self.data_opts.get("fmax"))+"\t"+label+"\t \n")
+                annotated_prediction_file.write(
+                    str(iterator) + "\tSpectrogram_1\t1\t" +
+                    str(start) + "\t" + str(end) + "\t" +
+                    str(self.data_opts.get("fmin")) + "\t" +
+                    str(self.data_opts.get("fmax")) + "\t" +
+                    (str(cnn_logit_mean) if cnn_logit_mean == cnn_logit_mean else "") + "\t" +  # NaN-safe
+                    label + "\t \n"
+                )
             iterator += 1
         annotated_prediction_file.close()
 
@@ -322,14 +330,77 @@ class setup_evaluator(object):
         onlyfiles = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
         return onlyfiles
 
+    def _parse_time_prob_frames(self, time_prob: List[Tuple[str, str, str | None]]):
+        """
+        Convert raw (time_range, prob, pred_class_idx) tuples into a list of frames:
+          [{'start': float, 'end': float, 'prob': float, 'logit': float}, ...]
+        """
+        frames = []
+        for time_range, prob_str, _ in time_prob:
+            try:
+                p = float(prob_str)
+            except Exception:
+                continue
+            # clamp probabilities to avoid +/- inf logits
+            p = min(max(p, 1e-6), 1.0 - 1e-6)
+            start_s, end_s = time_range.split("-")
+            s = float(start_s);
+            e = float(end_s)
+            logit = math.log(p / (1.0 - p))
+            frames.append({"start": s, "end": e, "prob": p, "logit": logit})
+        return frames
+
+    def _overlap(self, a0: float, a1: float, b0: float, b1: float) -> float:
+        """Return overlap duration in seconds between intervals [a0,a1] and [b0,b1]."""
+        return max(0.0, min(a1, b1) - max(a0, b0))
+
+    def _aggregate_cnn_score_for_selections(self, labeled_data, frames):
+        """
+        For each merged selection ([start,end], label) in labeled_data,
+        compute the duration-weighted mean logit across overlapping frames.
+        Returns a list of dicts aligned with labeled_data:
+          [{'start': s, 'end': e, 'label': label, 'cnn_logit_mean': value}, ...]
+        """
+        out = []
+        for (s, e), label in labeled_data:
+            num, den = 0.0, 0.0
+            for fr in frames:
+                w = self._overlap(s, e, fr["start"], fr["end"])
+                if w > 0:
+                    num += w * fr["logit"]
+                    den += w
+            cnn_logit_mean = (num / den) if den > 0 else float("nan")
+            out.append({"start": s, "end": e, "label": label, "cnn_logit_mean": cnn_logit_mean})
+        return out
+
     def process(self):
         path = self.config_data.get("prediction_dir")
         prediction_files = self.list_all_files_in_dir(path)
         for pred_file in prediction_files:
             if pred_file.find("_predict_output") != -1:
-                time_prob = self.read_prediction_file(path+"/"+pred_file)
-                labeled_data, duration = self.get_all_network_prediction_data(time_prob, self.config_data.get("threshold"))
-                threshold_depended_annotation_data_overlapped = self.get_overlapped_threshold_dependend_annotation_data(labeled_data, duration)
+                time_prob = self.read_prediction_file(path + "/" + pred_file)
+                labeled_data, duration = self.get_all_network_prediction_data(
+                    time_prob, self.config_data.get("threshold")
+                )
+
+                # frame list with start,end,prob,logit
+                frames = self._parse_time_prob_frames(time_prob)
+
+                # compute per-selection cnn_logit_mean
+                scored = self._aggregate_cnn_score_for_selections(labeled_data, frames)
+
+                # convert to writer format, including the score
+                threshold_depended_annotation_data_overlapped = []
+                for sel in scored:
+                    # (label_name, __, start, end, cnn_logit_mean, __)
+                    threshold_depended_annotation_data_overlapped.append(
+                        (self.classes_idx_label.get(int(sel["label"])),
+                         -1,
+                         sel["start"],
+                         sel["end"],
+                         sel["cnn_logit_mean"],
+                         False)
+                    )
                 if platform.system() == "Windows":
                     self.write_annotation_file(self.config_data["output_dir"] + "\\" + pred_file + ".annotation.result.txt", threshold_depended_annotation_data_overlapped)
                 else:
