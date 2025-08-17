@@ -320,8 +320,8 @@ class setup_evaluator(object):
                     str(start) + "\t" + str(end) + "\t" +
                     str(self.data_opts.get("fmin")) + "\t" +
                     str(self.data_opts.get("fmax")) + "\t" +
-                    (str(cnn_logit_mean) if cnn_logit_mean == cnn_logit_mean else "") + "\t" +  # NaN-safe
-                    label + "\t \n"
+                    label + "\t" +
+                    (str(cnn_logit_mean) if cnn_logit_mean == cnn_logit_mean else "") + "\t \n"
                 )
             iterator += 1
         annotated_prediction_file.close()
