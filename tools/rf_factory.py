@@ -75,14 +75,21 @@ def main():
     run_roots = sorted([Path(str(p).replace("/cfg/", "/runs/")).parent for p in cfg_root.glob("*/*/eval.cfg")])
 
     # write cfgs
-    cfg_paths = []
-    for run_root in run_roots:
-        model = run_root.parents[1].name
-        variant = run_root.name
-        cfg_dir = cfg_root / model / variant
+    cfg_paths = sorted((bench_root / "cfg").glob("*/*/eval.cfg"))
+
+    rf_cfgs = []
+    for eval_cfg in cfg_paths:
+        model = eval_cfg.parents[1].name  # …/cfg/<model>/<variant>/eval.cfg
+        variant = eval_cfg.parents[0].name
+        # where the RF will read/write results:
+        run_root = bench_root / "runs" / model / variant
+
+        # write rf.cfg next to eval.cfg (no "runs" under cfg!)
+        cfg_dir = bench_root / "cfg" / model / variant
+        cfg_dir.mkdir(parents=True, exist_ok=True)
         cfg_path = cfg_dir / "rf.cfg"
         cfg_path.write_text(CFG_TMPL.render(
-            run_root=str(run_root),
+            run_root=str(run_root.resolve()),
             audio_dir=str(Path(args.audio_root).resolve()),
             rf_model=str(Path(args.rf_model).resolve()),
             features=args.features,
@@ -92,16 +99,16 @@ def main():
             n_mfcc=args.n_mfcc,
             include_deltas=str(args.include_deltas).lower(),
         ))
-        cfg_paths.append(cfg_path)
+        rf_cfgs.append(cfg_path)
 
     # batch
     repo_root = Path(__file__).resolve().parents[1]
     rf_infer_py = repo_root.parents[1] / "alpaca-segmentation" / "random_forest" / "rf_infer.py"
     batch_txt = BATCH_TMPL.render(
         tag=args.features,
-        n_cfgs_minus1=len(cfg_paths) - 1,
+        n_cfgs_minus1=len(rf_cfgs) - 1,
         max_conc=args.max_concurrent,
-        cfgs=[str(p) for p in cfg_paths],
+        cfgs=[str(p) for p in rf_cfgs],
         jobs_dir=jobs_dir,
         repo_root=repo_root,
         rf_infer_py=str(rf_infer_py.resolve()),
