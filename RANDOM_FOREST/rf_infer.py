@@ -65,22 +65,40 @@ def derive_wave_from_table_name(txt_path: Path) -> str:
 
 
 def load_wave(audio_root: Path, wave_name: str) -> tuple[np.ndarray, int]:
-    cand = audio_root / wave_name
-    if not cand.exists():
-        alt = cand.with_suffix(".WAV")
-        if alt.exists():
-            cand = alt
-        else:
-            # final fallback: case-insensitive stem match
-            want = cand.stem.lower()
-            for p in audio_root.glob("*"):
-                if p.suffix.lower() == ".wav" and p.stem.lower() == want:
-                    cand = p;
-                    break
-            else:
-                raise FileNotFoundError(f"WAV not found: {audio_root}/{wave_name}")
+    """
+    Resolve the real WAV for a base like '388_20250204_2nd_Obs.wav' in a folder that
+    contains files such as '388_20250204_2nd_Obs.wav_0_3578.wav' or
+    'UNKN_20250203_05.23.wav_0_3593.wav'.
+    """
+    base = Path(wave_name).stem  # '388_20250204_2nd_Obs' or 'UNKN_20250203_05'
+    exact = audio_root / f"{base}.wav"
+    if exact.exists():
+        cand = exact
+    else:
+        # 1) strongest: '<base>.wav_' prefix (common Animal-Spot export)
+        cands = sorted(audio_root.glob(f"{base}.wav_*"))
+        cands += sorted(audio_root.glob(f"{base}.WAV_*"))
+        # 2) otherwise: any file that starts with '<base>' and ends with .wav
+        if not cands:
+            cands = sorted(p for p in audio_root.glob(f"{base}*.wav"))
+            cands += sorted(p for p in audio_root.glob(f"{base}*.WAV"))
+        # 3) case-insensitive fallback
+        if not cands:
+            low = base.lower()
+            cands = [p for p in audio_root.glob("*")
+                     if p.suffix.lower()==".wav" and p.name.lower().startswith(low)]
+        if not cands:
+            raise FileNotFoundError(f"WAV not found: {audio_root}/{wave_name}")
+
+        # Prefer ones that explicitly contain '.wav_' right after the base; else shortest name
+        pref = [p for p in cands if p.name.lower().startswith(f"{base.lower()}.wav_")]
+        cand = sorted(pref, key=lambda p: (len(p.name), p.name))[0] if pref else \
+               sorted(cands, key=lambda p: (len(p.name), p.name))[0]
+
     y, sr = sf.read(cand, always_2d=False)
-    if y.ndim > 1: y = y.mean(axis=1)
+    if y.ndim > 1:
+        y = y.mean(axis=1)
+    print(f"→ using audio: {cand}")  # small breadcrumb in logs
     return y.astype(np.float32, copy=False), sr
 
 

@@ -38,7 +38,7 @@ BATCH_TMPL = Template(textwrap.dedent("""#!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=02:00:00
+#SBATCH --time=00:10:00
 #SBATCH --account=kisski-dpz-alpaca-hum
 #SBATCH --array=0-{{ n_cfgs_minus1 }}%{{ max_conc }}
 #SBATCH --output={{ jobs_dir }}/job_logs/rf_%x-%j.out
@@ -59,7 +59,7 @@ def main():
     ap.add_argument("--benchmark-root", default="BENCHMARK", help="Path to BENCHMARK")
     ap.add_argument("--audio-root", required=True, help="Path to labelled_recordings with WAVs")
     ap.add_argument("--rf-model", required=True, help="Path to joblib/pkl RF model")
-    ap.add_argument("--rf-threshold", type=float, default=0.53)
+    ap.add_argument("--rf-threshold", type=float, default=0.70)
     ap.add_argument("--n-fft", type=int, default=2048)
     ap.add_argument("--hop", type=int, default=1024)
     ap.add_argument("--n-mfcc", type=int, default=13)
