@@ -99,7 +99,9 @@ def main():
     # batch
     repo_root = Path(__file__).resolve().parents[1]
     # path to rf_infer.py in the alpaca-segmentation repo
-    rf_infer_py = repo_root.parents[1] / "alpaca-segmentation" / "random_forest" / "rf_infer.py"
+    rf_infer_py = repo_root / "RANDOM_FOREST" / "rf_infer.py"
+    if not rf_infer_py.exists():
+        raise FileNotFoundError(f"rf_infer.py not found at: {rf_infer_py}")
 
     batch_txt = BATCH_TMPL.render(
         n_cfgs_minus1=len(rf_cfgs) - 1,
