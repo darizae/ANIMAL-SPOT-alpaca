@@ -9,7 +9,7 @@ python tools/rf_factory.py \
   --benchmark-root BENCHMARK \
   --rf-model /user/.../alpaca-segmentation/random_forest/models/rf_features_with_labels_neg1.pkl \
   --features union \
-  --rf-threshold 0.35 \
+  --rf-threshold 0.53 \
   --audio-root /user/.../alpaca-segmentation/data/benchmark_corpus_v1/labelled_recordings
 """
 
@@ -58,7 +58,7 @@ def main():
     ap.add_argument("--audio-root", required=True, help="Path to labelled_recordings with WAVs")
     ap.add_argument("--rf-model", required=True, help="Path to joblib/pkl RF model")
     ap.add_argument("--features", default="union", choices=["union", "spectral", "mfcc"])
-    ap.add_argument("--rf-threshold", type=float, default=0.35)
+    ap.add_argument("--rf-threshold", type=float, default=0.53)
     ap.add_argument("--n-fft", type=int, default=2048)
     ap.add_argument("--hop", type=int, default=1024)
     ap.add_argument("--n-mfcc", type=int, default=13)
