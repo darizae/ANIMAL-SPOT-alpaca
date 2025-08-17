@@ -11,16 +11,17 @@
 
 ## 🧱 Components
 
-| Step | What happens                                                    | Where         | Tool / Command                                                                     | Repository          |
-|------|-----------------------------------------------------------------|---------------|------------------------------------------------------------------------------------|---------------------|
-| -1   | Build **training datasets** for ANIMAL-SPOT                     | local         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]` | alpaca-segmentation |
-| 0    | Generate **training** configs & job array script                | login         | `python tools/training_factory.py` (symlink to training script)                    | ANIMAL-SPOT-alpaca  |
-| 1    | Submit training jobs (GPU)                                      | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                           | ANIMAL-SPOT-alpaca  |
-| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files | login         | `python tools/benchmark_factory.py …`                                              | ANIMAL-SPOT-alpaca  |
-| 3    | Submit prediction arrays                                        | login → Slurm | `bash BENCHMARK/jobs/pred_models.batch`                                            | ANIMAL-SPOT-alpaca  |
-| 4    | Generate **CPU evaluation** job arrays                          | login         | `python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20`      | ANIMAL-SPOT-alpaca  |
-| 5    | Submit evaluation arrays                                        | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                            | ANIMAL-SPOT-alpaca  |
-| 6    | Jupyter insight notebook                                        | local         | `jupyter lab tools/metrics_analysis.py`                                            | alpaca-segmentation |
+| Step | What happens                                                                  | Where         | Tool / Command                                                                            | Repository          |
+|------|-------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------|---------------------|
+| -1   | Build **training datasets** for ANIMAL-SPOT                                   | local         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]`        | alpaca-segmentation |
+| 0    | Generate **training** configs & job array                                     | login         | `python tools/training_factory.py`                                                        | ANIMAL-SPOT-alpaca  |
+| 1    | Submit training jobs (GPU)                                                    | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                                  | ANIMAL-SPOT-alpaca  |
+| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files               | login         | `python tools/benchmark_factory.py …`                                                     | ANIMAL-SPOT-alpaca  |
+| 3    | Submit prediction arrays                                                      | login → Slurm | `bash BENCHMARK/jobs/pred_models.batch`                                                   | ANIMAL-SPOT-alpaca  |
+| 4    | Generate **CPU evaluation** job arrays                                        | login         | `python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20`             | ANIMAL-SPOT-alpaca  |
+| 5    | Submit evaluation arrays (writes `evaluation/index.json`)                     | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                                   | ANIMAL-SPOT-alpaca  |
+| 6    | **RF post-processing (GPU)** – auto feature extraction + Random-Forest filter | login         | `python tools/rf_factory.py …` → `bash BENCHMARK/jobs/rf_runs.batch`                      | ANIMAL-SPOT-alpaca  |
+| 7    | **Compare metrics (baseline vs RF)**                                          | local         | `python tools/evaluate_benchmark.py --layer both …` → `jupyter lab data_postprocessing/…` | alpaca-segmentation |
 
 ---
 
@@ -231,22 +232,80 @@ Each array task:
 
 ---
 
-### 6️⃣  Visualise results
+## 6️⃣  RF post-processing (GPU)
 
-Before running the evaluation script, pull the results of the **EVALUATION** step (index files, selection tables, etc.):
+**Goal.** Filter the CNN’s merged selections with a trained Random-Forest (RF) using **automatically extracted audio features** (Python), plus the **aggregate CNN logit** per selection.
 
-```bash
-bash data_preprocessing/pull_runs.sh
+### What the RF extractor computes (per selection)
+
+Given each selection from `evaluation/annotations/*.annotation.result.txt`:
+
+* **Audio slice**: loads the corresponding **labelled recording**; averages to mono.
+* **Robust spectral features** (Raven-style approximations):
+
+  * `Dur 50%`, `Dur 90%` (energy spans), `Center Freq`, `Freq 5/25/75/95%`,
+  * `BW 50%`, `BW 90%`, `Avg Entropy`, `Agg Entropy`.
+* **MFCC summaries**: mean & std of `n_mfcc` coefficients over frames in the selection.
+
+  * Optional **Δ** and **ΔΔ** (time derivatives) if `include_deltas=true`.
+* **CNN logit (mean)**: Computed **mean** over the overlapped windows and include it as feature `cnn_logit_mean`. (If absent, RF works without it.)
+* All features are computed with the STFT params from `rf.cfg`: `n_fft`, `hop`, and MFCC settings.
+
+### Where files go
+
+For each run `BENCHMARK/runs/<model>/<variant>/` the RF job writes:
+
+```
+postrf/
+  annotations/
+    <tape>_predict_output.log.annotation.result.txt      # filtered selections
+  features_py/
+    <table>.features_all.csv                              # per-table feature dump
+  index.json                                              # same schema as evaluation/index.json (+ rf meta)
 ```
 
-Then compute metrics and launch the analysis notebook
+### How to generate & run the RF jobs
+
+The factory creates one `rf.cfg` per model×variant and a Slurm array to run them on CPU.
+
+```bash
+cd ~/repos/ANIMAL-SPOT-alpaca
+
+# Build cfgs + batch (ALWAYS extracts ALL features; no feature toggle)
+python tools/rf_factory.py \
+  --benchmark-root BENCHMARK \
+  --audio-root path/to/labelled/recordings \
+  --rf-model  path/to/random-forest/model.pkl \
+  --n-fft 2048 --hop 1024 --include-deltas
+
+# Launch CPU array
+bash BENCHMARK/jobs/rf_runs.batch
+```
+
+> The factory writes `rf.cfg` alongside each `eval.cfg` and calls
+> `RANDOM_FOREST/rf_infer.py`.
+
+### 7️⃣  Visualise results
+
+se the evaluator that supports **`--layer`**:
+
+* **Baseline CNN** rows come from `evaluation/index.json`
+* **CNN → RF** rows come from `postrf/index.json`
+* With `--layer both` the CSV contains both, tagged by a `layer` column.
 
 ```bash
 python tools/evaluate_benchmark.py \
-  --gt data/benchmark_corpus_v1/corpus_index.json \
+  --gt   data/benchmark_corpus_v1/corpus_index.json \
   --runs BENCHMARK/runs \
-  --out metrics.csv
+  --iou  0.40 \
+  --layer both \
+  --out  BENCHMARK/metrics.csv \
+  --per-tape-out BENCHMARK/metrics_per_tape.csv
+```
 
+Then open the side-by-side notebook:
+
+```bash
 jupyter lab data_postprocessing/metrics_analysis.ipynb
 ```
 
