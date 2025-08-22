@@ -1,3 +1,22 @@
+# ANIMAL-SPOT-alpaca (fork)
+
+> Based on the original **[ANIMAL-SPOT](https://github.com/ChristianBergler/ANIMAL-SPOT)** repository:  
+> this project adapts and extends it for **alpaca hum segmentation**,  
+> adding dataset preparation utilities, feature extraction, evaluation scripts,  
+> and an optional **Random-Forest (RF)** post-processing layer.
+
+
+**What this fork adds**
+- Batch **factories**: `tools/training_factory.py`, `benchmark_factory.py`, `eval_factory.py`
+- **Benchmark** layout and index builder (`tools/build_pred_index.py`)
+- Optional **RF post-filter** (feature extraction + classification)
+- Reproducible **metrics** (global + per-tape) and notebooks
+
+**Docs**
+- Quick start (below)
+- Detailed pipeline: [`docs/PIPELINE.md`](docs/PIPELINE.md)
+- Upstream README (verbatim): **see below**
+
 # ANIMAL-SPOT enables animal-independent signal detection and classification using deep learning
 
 - [General Description](#general-description)

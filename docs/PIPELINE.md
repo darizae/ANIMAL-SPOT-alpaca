@@ -1,6 +1,4 @@
-## ✅ Pipeline
-
-### 🎯 Strategy
+## Alpaca Segmentation Pipeline Usage
 
 1. **GPU nodes** for the heavy training and prediction jobs.
 2. **CPU nodes (scc-cpu)** for the evaluation arrays — no GPU hours wasted.
@@ -25,11 +23,12 @@
 
 ---
 
-### Activate Virtual Environment
+### Setup (in HPC)
 ```bash
-export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
-eval "$(micromamba shell hook --shell=bash)"
-micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
+# Python ≥3.11 recommended
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ---
