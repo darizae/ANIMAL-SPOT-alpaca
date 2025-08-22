@@ -9,17 +9,19 @@
 
 ## 🧱 Components
 
-| Step | What happens                                                                  | Where         | Tool / Command                                                                            | Repository          |
-|------|-------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------|---------------------|
-| -1   | Build **training datasets** for ANIMAL-SPOT                                   | local         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]`        | alpaca-segmentation |
-| 0    | Generate **training** configs & job array                                     | login         | `python tools/training_factory.py`                                                        | ANIMAL-SPOT-alpaca  |
-| 1    | Submit training jobs (GPU)                                                    | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                                  | ANIMAL-SPOT-alpaca  |
-| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files               | login         | `python tools/benchmark_factory.py …`                                                     | ANIMAL-SPOT-alpaca  |
-| 3    | Submit prediction arrays                                                      | login → Slurm | `bash BENCHMARK/jobs/pred_models.batch`                                                   | ANIMAL-SPOT-alpaca  |
-| 4    | Generate **CPU evaluation** job arrays                                        | login         | `python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20`             | ANIMAL-SPOT-alpaca  |
-| 5    | Submit evaluation arrays (writes `evaluation/index.json`)                     | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                                   | ANIMAL-SPOT-alpaca  |
-| 6    | **RF post-processing (GPU)** – auto feature extraction + Random-Forest filter | login         | `python tools/rf_factory.py …` → `bash BENCHMARK/jobs/rf_runs.batch`                      | ANIMAL-SPOT-alpaca  |
-| 7    | **Compare metrics (baseline vs RF)**                                          | local         | `python tools/evaluate_benchmark.py --layer both …` → `jupyter lab data_postprocessing/…` | alpaca-segmentation |
+| Step | What happens                                                                  | Where         | Tool / Command                                                                            | Repository                                                            |
+|------|-------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| -1   | Build **training datasets** for ANIMAL-SPOT                                   | local         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]`        | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
+|
+| 0    | Generate **training** configs & job array                                     | login         | `python tools/training_factory.py`                                                        | ANIMAL-SPOT-alpaca                                                    |
+| 1    | Submit training jobs (GPU)                                                    | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                                  | ANIMAL-SPOT-alpaca                                                    |
+| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files               | login         | `python tools/benchmark_factory.py …`                                                     | ANIMAL-SPOT-alpaca                                                    |
+| 3    | Submit prediction arrays                                                      | login → Slurm | `bash BENCHMARK/jobs/pred_models.batch`                                                   | ANIMAL-SPOT-alpaca                                                    |
+| 4    | Generate **CPU evaluation** job arrays                                        | login         | `python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20`             | ANIMAL-SPOT-alpaca                                                    |
+| 5    | Submit evaluation arrays (writes `evaluation/index.json`)                     | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                                   | ANIMAL-SPOT-alpaca                                                    |
+| 6    | **RF post-processing (GPU)** – auto feature extraction + Random-Forest filter | login         | `python tools/rf_factory.py …` → `bash BENCHMARK/jobs/rf_runs.batch`                      | ANIMAL-SPOT-alpaca                                                    |
+| 7    | **Compare metrics (baseline vs RF)**                                          | local         | `python tools/evaluate_benchmark.py --layer both …` → `jupyter lab data_postprocessing/…` | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
+|
 
 ---
 
