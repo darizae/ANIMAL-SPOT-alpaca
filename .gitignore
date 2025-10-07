@@ -36,3 +36,4 @@ EVALUATION/evaluation_annotations/
 alpaca_data/
 
 BENCHMARK/
+.DS_Store

@@ -26,11 +26,68 @@
 ---
 
 ### Setup (in HPC)
+
+### 0) Go to the project space
+
 ```bash
-# Python ≥3.11 recommended
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+cd /projects/extern/kisski/{project-name}/dir.project
+```
+
+### 1) micromamba (install + shell hook)
+
+```bash
+mkdir -p tools
+curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
+  | tar -xvj -C tools bin/micromamba
+
+sed -i '/^exit$/d' ~/.bashrc
+{
+  echo '# micromamba (project-local)'
+  echo 'export MAMBA_ROOT_PREFIX=/projects/extern/kisski/{project-name}/dir.project/mamba'
+  echo 'eval "$(/projects/extern/kisski/{project-name}/dir.project/tools/bin/micromamba shell hook -s bash)"'
+} >> ~/.bashrc
+source ~/.bashrc
+type micromamba
+```
+
+### 2) Create env (GPU-ready)
+
+```bash
+micromamba config set channel_priority strict
+micromamba config append channels pytorch
+micromamba config append channels nvidia
+micromamba config append channels conda-forge
+
+micromamba create -y -n animal-spot python=3.11
+micromamba activate animal-spot
+micromamba install -y pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+micromamba install -y librosa scikit-image soundfile matplotlib pillow six opencv tqdm pandas tensorboardx
+```
+
+### 3) Git user (in this HPC env)
+
+```bash
+git config --global user.name "Your Git User"
+git config --global user.email "your_git_user_email@stud.uni-goettingen.de"
+git config --global pull.rebase false
+```
+
+### 4) Code + data locations (exact)
+
+Clone repo:
+
+```bash
+mkdir -p /projects/extern/kisski/{project-name}/dir.project/repos
+cd /projects/extern/kisski/{project-name}/dir.project/repos
+git clone https://github.com/darizae/ANIMAL-SPOT-alpaca.git
+cd ANIMAL-SPOT-alpaca
+```
+
+Where everything should live:
+```
+/projects/extern/kisski/{project-name}/dir.project/
+  alpaca-segmentation/data/                 # your datasets live here
+  repos/ANIMAL-SPOT-alpaca/                 # repo lives here
 ```
 
 ---
