@@ -1,27 +1,38 @@
 #!/bin/bash
 ###############################################################################
 #  ANIMAL-SPOT alpaca project – evaluation launcher + index builder
-#
 #  Evaluates all variants found in BENCHMARK/cfg without filtering.
 #
 #  Usage:
-#  ---------------------------------------------------------------------------
-#  bash run_evaluation.sh
-#
+#    bash tools/run_evaluation.sh
 ###############################################################################
 
-# ─── absolute, repo-localised anchors ─────────────────────────────────────────
-REPO_ROOT="/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca"
-BENCHMARK_ROOT="${REPO_ROOT}/BENCHMARK"
+set -euo pipefail
+
+# ─── repo-localised anchors + .env ───────────────────────────────────────────
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "${REPO_ROOT}/.env"
+  set +a
+fi
+
+BENCHMARK_ROOT="${BENCHMARK_ROOT:-${REPO_ROOT}/BENCHMARK}"
 EVAL_SCRIPT="${REPO_ROOT}/EVALUATION/start_evaluation.py"
 PRED_IDX_SCRIPT="${REPO_ROOT}/tools/build_pred_index.py"
 
 # ─── micromamba env ──────────────────────────────────────────────────────────
-export PATH="/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:${PATH}"
-set +u        # deactivate nounset while sourcing activation scripts
-eval "$(micromamba shell hook --shell=bash)"
-micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
-set -u        # re-enable nounset
+export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-}"
+if [[ -n "${MAMBA_EXE:-}" ]]; then
+  eval "$(${MAMBA_EXE} shell hook --shell=bash)"
+else
+  # fallback to PATH-resolved micromamba
+  eval "$(micromamba shell hook --shell=bash)"
+fi
+micromamba activate "${MAMBA_ENV_NAME:-animal-spot}"
 
 echo "▶ Starting evaluation at $(date)"
 
@@ -31,8 +42,8 @@ find "${BENCHMARK_ROOT}/cfg" -type f -name eval.cfg | sort | while read -r CFG; 
   model_dir="$(dirname "${variant_dir}")"        # …/cfg/<model>
   model_name="$(basename "${model_dir}")"
   variant_name="$(basename "${variant_dir}")"
-  RUN_ROOT="${BENCHMARK_ROOT}/runs/${model_name}/${variant_name}"
 
+  RUN_ROOT="${BENCHMARK_ROOT}/runs/${model_name}/${variant_name}"
   echo "─── Evaluating: ${RUN_ROOT}"
 
   # 1️⃣ evaluation

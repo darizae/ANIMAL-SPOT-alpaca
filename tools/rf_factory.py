@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
-Generate rf.cfg files + a CPU Slurm array that runs alpaca-segmentation/random_forest/rf_infer.py
+Generate rf.cfg files + a CPU Slurm array that runs RANDOM_FOREST/rf_infer.py
 for every BENCHMARK run (model × variant).
-
-Always extracts ALL features (robust spectral + MFCC ± deltas).
-No feature-choice argument.
+Always extracts ALL features.
 
 Usage
 -----
@@ -15,10 +13,23 @@ python tools/rf_factory.py \
   --rf-threshold 0.53 \
   --n-fft 2048 --hop 1024 --n-mfcc 13 --include-deltas
 """
-
 from pathlib import Path
-import argparse, textwrap
+import argparse, textwrap, os
 from jinja2 import Template
+
+# ───────────────────── .env loader ────────────────────────────────────────────
+def load_dotenv_from_repo():
+    repo_root = Path(__file__).resolve().parents[1]
+    env_path = repo_root / ".env"
+    if env_path.exists():
+        for ln in env_path.read_text().splitlines():
+            ln = ln.strip()
+            if not ln or ln.startswith("#") or "=" not in ln:
+                continue
+            k, v = ln.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+    return repo_root
+REPO_ROOT = load_dotenv_from_repo()
 
 CFG_TMPL = Template(textwrap.dedent("""\
 # RF post-processing config (ALL features)
@@ -34,29 +45,29 @@ include_deltas={{ include_deltas }}
 
 BATCH_TMPL = Template(textwrap.dedent("""#!/bin/bash
 #SBATCH --job-name=rf_all
-#SBATCH --partition=kisski
-#SBATCH --nodes=1
+#SBATCH --partition={{ slurm_partition }}
+#SBATCH --nodes={{ slurm_nodes }}
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=00:10:00
-#SBATCH --account=kisski-dpz-alpaca-hum
+#SBATCH --cpus-per-task={{ slurm_cpus }}
+#SBATCH --time={{ slurm_rf_time }}
+#SBATCH --account={{ slurm_account }}
 #SBATCH --array=0-{{ n_cfgs_minus1 }}%{{ max_conc }}
 #SBATCH --output={{ jobs_dir }}/job_logs/rf_%x-%j.out
 #SBATCH --error={{ jobs_dir }}/job_logs/rf_%x-%j.err
 #SBATCH --chdir={{ repo_root }}
 
-export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
-eval "$(micromamba shell hook --shell=bash)"
-micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
+export MAMBA_ROOT_PREFIX={{ mamba_root_prefix }}
+eval "$({{ mamba_exe }} shell hook -s bash)"
+micromamba activate {{ mamba_env_name }}
 
 CFG=( {% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %} )
 python {{ rf_infer_py }} "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """))
 
-
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--benchmark-root", default="BENCHMARK", help="Path to BENCHMARK")
+    ap.add_argument("--benchmark-root", default=os.getenv("BENCHMARK_ROOT", "BENCHMARK"),
+                    help="Path to BENCHMARK")
     ap.add_argument("--audio-root", required=True, help="Path to labelled_recordings with WAVs")
     ap.add_argument("--rf-model", required=True, help="Path to joblib/pkl RF model")
     ap.add_argument("--rf-threshold", type=float, default=0.70)
@@ -74,15 +85,14 @@ def main():
 
     # discover model/variant pairs from cfg tree
     eval_cfgs = sorted((cfg_root).glob("*/*/eval.cfg"))
-
     rf_cfgs = []
     for eval_cfg in eval_cfgs:
-        model = eval_cfg.parents[1].name  # …/cfg/<model>/<variant>/eval.cfg
+        model = eval_cfg.parents[1].name
         variant = eval_cfg.parents[0].name
         run_root = bench_root / "runs" / model / variant
-
         cfg_dir = cfg_root / model / variant
         cfg_dir.mkdir(parents=True, exist_ok=True)
+
         cfg_path = cfg_dir / "rf.cfg"
         cfg_path.write_text(CFG_TMPL.render(
             run_root=str(run_root.resolve()),
@@ -97,8 +107,7 @@ def main():
         rf_cfgs.append(cfg_path)
 
     # batch
-    repo_root = Path(__file__).resolve().parents[1]
-    # path to rf_infer.py in the alpaca-segmentation repo
+    repo_root = REPO_ROOT
     rf_infer_py = repo_root / "RANDOM_FOREST" / "rf_infer.py"
     if not rf_infer_py.exists():
         raise FileNotFoundError(f"rf_infer.py not found at: {rf_infer_py}")
@@ -110,6 +119,15 @@ def main():
         jobs_dir=jobs_dir,
         repo_root=repo_root,
         rf_infer_py=str(rf_infer_py.resolve()),
+        # env
+        mamba_exe=os.getenv("MAMBA_EXE", "micromamba"),
+        mamba_root_prefix=os.getenv("MAMBA_ROOT_PREFIX", ""),
+        mamba_env_name=os.getenv("MAMBA_ENV_NAME", "animal-spot"),
+        slurm_partition=os.getenv("SLURM_PARTITION", "kisski"),
+        slurm_nodes=int(os.getenv("SLURM_NODES", "1")),
+        slurm_cpus=int(os.getenv("SLURM_CPUS", "8")),
+        slurm_rf_time=os.getenv("SLURM_RF_TIME", "00:10:00"),
+        slurm_account=os.getenv("SLURM_ACCOUNT", "kisski-dpz-alpaca-hum"),
     )
     batch_path = jobs_dir / "rf_all.batch"
     batch_path.write_text(batch_txt)
@@ -121,7 +139,6 @@ def main():
     print(f"📝 wrote {len(rf_cfgs)} rf.cfg files under {cfg_root}")
     print(f"📝 wrote {batch_path}")
     print(f"📝 wrote {master}")
-
 
 if __name__ == "__main__":
     main()
