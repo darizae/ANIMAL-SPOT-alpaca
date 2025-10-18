@@ -37,3 +37,5 @@ alpaca_data/
 
 BENCHMARK/
 .DS_Store
+
+data/
