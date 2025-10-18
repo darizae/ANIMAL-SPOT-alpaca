@@ -1,4 +1,4 @@
-## Alpaca Segmentation Pipeline Usage
+## Alpaca Segmentation Pipeline Usage. Replace any placeholder of the project name by the actual project name, which is "kisski-alpaca-2". Absolutely do not change anything else from the README.
 
 1. **GPU nodes** for the heavy training and prediction jobs.
 2. **CPU nodes (scc-cpu)** for the evaluation arrays — no GPU hours wasted.
@@ -12,7 +12,7 @@
 | Step | What happens                                                                  | Where         | Tool / Command                                                                            | Repository                                                            |
 |------|-------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
 | -1   | Build **training datasets** for ANIMAL-SPOT                                   | local         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]`        | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
-|
+|      |                                                                               |               |                                                                                           |                                                                       |
 | 0    | Generate **training** configs & job array                                     | login         | `python tools/training_factory.py`                                                        | ANIMAL-SPOT-alpaca                                                    |
 | 1    | Submit training jobs (GPU)                                                    | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                                  | ANIMAL-SPOT-alpaca                                                    |
 | 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files               | login         | `python tools/benchmark_factory.py …`                                                     | ANIMAL-SPOT-alpaca                                                    |
@@ -21,7 +21,7 @@
 | 5    | Submit evaluation arrays (writes `evaluation/index.json`)                     | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                                   | ANIMAL-SPOT-alpaca                                                    |
 | 6    | **RF post-processing (GPU)** – auto feature extraction + Random-Forest filter | login         | `python tools/rf_factory.py …` → `bash BENCHMARK/jobs/rf_runs.batch`                      | ANIMAL-SPOT-alpaca                                                    |
 | 7    | **Compare metrics (baseline vs RF)**                                          | local         | `python tools/evaluate_benchmark.py --layer both …` → `jupyter lab data_postprocessing/…` | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
-|
+|      |                                                                               |               |                                                                                           |                                                                       |
 
 ---
 
@@ -30,7 +30,7 @@
 ### 0) Go to the project space
 
 ```bash
-cd /projects/extern/kisski/{project-name}/dir.project
+cd /projects/extern/kisski/kisski-alpaca-2/dir.project
 ```
 
 ### 1) micromamba (install + shell hook)
@@ -43,8 +43,8 @@ curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
 sed -i '/^exit$/d' ~/.bashrc
 {
   echo '# micromamba (project-local)'
-  echo 'export MAMBA_ROOT_PREFIX=/projects/extern/kisski/{project-name}/dir.project/mamba'
-  echo 'eval "$(/projects/extern/kisski/{project-name}/dir.project/tools/bin/micromamba shell hook -s bash)"'
+  echo 'export MAMBA_ROOT_PREFIX=/projects/extern/kisski/kisski-alpaca-2/dir.project/mamba'
+  echo 'eval "$(/projects/extern/kisski/kisski-alpaca-2/dir.project/tools/bin/micromamba shell hook -s bash)"'
 } >> ~/.bashrc
 source ~/.bashrc
 type micromamba
@@ -79,15 +79,16 @@ git config --global pull.rebase false
 Clone repo:
 
 ```bash
-mkdir -p /projects/extern/kisski/{project-name}/dir.project/repos
-cd /projects/extern/kisski/{project-name}/dir.project/repos
+mkdir -p /projects/extern/kisski/kisski-alpaca-2/dir.project/repos
+cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos
 git clone https://github.com/darizae/ANIMAL-SPOT-alpaca.git
 cd ANIMAL-SPOT-alpaca
 ```
 
 Where everything should live:
+
 ```
-/projects/extern/kisski/{project-name}/dir.project/
+/projects/extern/kisski/kisski-alpaca-2/dir.project/
   alpaca-segmentation/data/                 # your datasets live here
   repos/ANIMAL-SPOT-alpaca/                 # repo lives here
 ```
@@ -99,13 +100,10 @@ Where everything should live:
 ### -1️⃣  Prepare training datasets
 
 ```bash
-cd ~/repos/ANIMAL-SPOT-alpaca
+cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
 # Default use (includes noise mining + Raven selection tables)
 python data_preprocessing/prepare_datasets.py data/training_corpus_v1
-
-# Optional: add PNG spectrograms per clip
-python data_preprocessing/prepare_datasets.py data/training_corpus_v1 --generate_spectrograms
 ```
 
 Creates:
@@ -118,7 +116,7 @@ Creates:
 Data lands here on KISSKI:
 
 ```
-/projects/extern/kisski/{project-name}/dir.project/alpaca-segmentation/data/
+/projects/extern/kisski/kisski-alpaca-2/dir.project/alpaca-segmentation/data/
 ```
 
 ---
@@ -180,7 +178,7 @@ chmod +x data_preprocessing/upload_datasets.sh
 ### 0️⃣  Build training configs and Slurm array
 
 ```bash
-cd ~/repos/ANIMAL-SPOT-alpaca
+cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
 python tools/training_factory.py
 ```
@@ -194,7 +192,7 @@ Creates:
 Each training variant is auto-generated based on the folders found under:
 
 ```bash
-/projects/extern/kisski/{project-name}/dir.project/alpaca-segmentation/data
+/projects/extern/kisski/kisski-alpaca-2/dir.project/alpaca-segmentation/data
 ```
 
 (You can override this path using `--data_root`)
@@ -208,6 +206,7 @@ Each `alpaca_server.cfg` uses the **global training parameters** defined in `too
 Variant names are generated as `v1_<name>`, `v2_<name>`, etc., in lexicographical order of the dataset folders.
 
 Example entry:
+
 ```json
 "v3_tape_proportional": {
   "dataset": "training_corpus_v1/dataset_proportional_by_tape",
@@ -249,7 +248,7 @@ Outputs go to:
 ### 2️⃣  Setup & prediction cfgs
 
 ```bash
-cd ~/repos/ANIMAL-SPOT-alpaca
+cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
 python tools/benchmark_factory.py \
   --corpus-root data/benchmark_corpus_v1 \
@@ -355,7 +354,7 @@ postrf/
 The factory creates one `rf.cfg` per model×variant and a Slurm array to run them on CPU.
 
 ```bash
-cd ~/repos/ANIMAL-SPOT-alpaca
+cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
 # Build cfgs + batch (ALWAYS extracts ALL features; no feature toggle)
 python tools/rf_factory.py \
