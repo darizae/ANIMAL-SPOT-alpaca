@@ -66,6 +66,8 @@ micromamba install -y librosa scikit-image soundfile matplotlib pillow six openc
 
 ### 3) Git user (in this HPC env)
 
+If you don't have a Git account, see ... to create one. After that, on the HPC terminal:
+
 ```bash
 git config --global user.name "Your Git User"
 git config --global user.email "your_git_user_email@stud.uni-goettingen.de"
@@ -113,6 +115,12 @@ Creates:
 * `selection_tables/` — Raven-compatible `.txt` for all target clips
 * `spectrograms/` (optional) — PNGs aligned with the WAVs
 
+Data lands here on KISSKI:
+
+```
+/projects/extern/kisski/{project-name}/dir.project/alpaca-segmentation/data/
+```
+
 ---
 
 Each dataset variant is defined in `dataset_prep_configs.json`. The script builds all listed `active_strategies` automatically.
@@ -147,6 +155,26 @@ After building, verify stats using:
 python data_preprocessing/count_dataset_files.py
 ```
 
+### Data upload (run locally via `alpaca-segmentation` script)
+
+Always upload datasets from your **local machine** using the script in `alpaca-segmentation`.
+
+**Set your project once** inside the script:
+
+```bash
+# in alpaca-segmentation/data_preprocessing/upload_datasets.sh
+PROJECT_NAME="kisski-alpaca-2"   # ← change to your HPC project if different
+```
+
+Then run (locally):
+
+```bash
+cd /path/to/alpaca-segmentation
+chmod +x data_preprocessing/upload_datasets.sh
+./data_preprocessing/upload_datasets.sh data/training_corpus_v1
+./data_preprocessing/upload_datasets.sh data/benchmark_corpus_v1
+```
+
 ---
 
 ### 0️⃣  Build training configs and Slurm array
@@ -166,7 +194,7 @@ Creates:
 Each training variant is auto-generated based on the folders found under:
 
 ```bash
-/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data/training_corpus_v1
+/projects/extern/kisski/{project-name}/dir.project/alpaca-segmentation/data
 ```
 
 (You can override this path using `--data_root`)
