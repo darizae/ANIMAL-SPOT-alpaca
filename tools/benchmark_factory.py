@@ -89,8 +89,9 @@ python PREDICTION/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
 DEFAULT_TRAINING_ROOT = Path(os.getenv("TRAINING_ROOT", REPO_ROOT / "TRAINING")).resolve()
 DEFAULT_BENCHMARK_ROOT = Path(os.getenv("BENCHMARK_ROOT", REPO_ROOT / "BENCHMARK")).resolve()
 DEFAULT_SRC_DIR = Path(os.getenv("SRC_DIR", REPO_ROOT / "ANIMAL-SPOT")).resolve()
-DEFAULT_CORPUS_BASE = Path(os.getenv("BENCHMARK_CORPUS_BASE",
-                                     os.getenv("ALPACA_SEG_ROOT", REPO_ROOT.parent / "alpaca-segmentation"))).resolve()
+DEFAULT_CORPUS_BASE = Path(
+    os.getenv("BENCHMARK_CORPUS_BASE", os.getenv("DATA_ROOT", REPO_ROOT / "data"))
+).resolve()
 
 def main(args):
     repo_root = REPO_ROOT

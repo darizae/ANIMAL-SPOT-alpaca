@@ -88,9 +88,14 @@ cd ANIMAL-SPOT-alpaca
 Where everything should live:
 
 ```
-/projects/extern/kisski/kisski-alpaca-2/dir.project/
-  alpaca-segmentation/data/                 # your datasets live here
-  repos/ANIMAL-SPOT-alpaca/                 # repo lives here
+/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/
+  data/                                   # all corpora live here
+    training_corpus_v1/
+    benchmark_corpus_v1/
+  TRAINING/                               # training cfg/jobs/runs
+  BENCHMARK/                              # prediction/eval/rf cfg/jobs/runs
+  data_preprocessing/                     # build_index, prepare_dataset, etc.
+  tools/                                  # factories for training/benchmark/eval
 ```
 
 ---
@@ -102,8 +107,15 @@ Where everything should live:
 ```bash
 cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
-# Default use (includes noise mining + Raven selection tables)
-python data_preprocessing/prepare_datasets.py data/training_corpus_v1
+# 1) Build corpus index (training/benchmark)
+make data-index CORPUS=training_corpus_v1
+make data-index CORPUS=benchmark_corpus_v1
+
+# 2) Create dataset_* splits (+ optional spectrograms)
+make data-prepare CORPUS=training_corpus_v1               # fast
+
+# 3) Sanity counts
+make data-count
 ```
 
 Creates:
@@ -116,7 +128,7 @@ Creates:
 Data lands here on KISSKI:
 
 ```
-/projects/extern/kisski/kisski-alpaca-2/dir.project/alpaca-segmentation/data/
+/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data/
 ```
 
 ---

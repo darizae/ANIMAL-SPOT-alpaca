@@ -1,0 +1,138 @@
+{
+  "active_strategies": [
+    "random_nph_0.5",
+    "random_nph_1",
+    "random_nph_1.5",
+    "random_nph_2",
+    "quality_balanced_nph_0.5",
+    "quality_balanced_nph_1",
+    "quality_balanced_nph_1.5",
+    "quality_balanced_nph_2",
+    "clipwise_balanced_nph_0.5",
+    "clipwise_balanced_nph_1",
+    "clipwise_balanced_nph_1.5",
+    "clipwise_balanced_nph_2",
+    "quality_and_clipwise_balanced_nph_0.5",
+    "quality_and_clipwise_balanced_nph_1",
+    "quality_and_clipwise_balanced_nph_1.5",
+    "quality_and_clipwise_balanced_nph_2"
+  ],
+
+  "strategies": {
+    "random_nph_0.5": {
+      "split_strategy": "random",
+      "seed": 42,
+      "min_quality": 1,
+      "noise_per_hum": 0.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "random_nph_1": {
+      "split_strategy": "random",
+      "seed": 43,
+      "min_quality": 1,
+      "noise_per_hum": 1,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "random_nph_1.5": {
+      "split_strategy": "random",
+      "seed": 44,
+      "min_quality": 1,
+      "noise_per_hum": 1.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "random_nph_2": {
+      "split_strategy": "random",
+      "seed": 45,
+      "min_quality": 1,
+      "noise_per_hum": 2,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+
+    "quality_balanced_nph_0.5": {
+      "split_strategy": "quality_balanced",
+      "seed": 911,
+      "min_quality": 1,
+      "noise_per_hum": 0.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "quality_balanced_nph_1": {
+      "split_strategy": "quality_balanced",
+      "seed": 912,
+      "min_quality": 1,
+      "noise_per_hum": 1,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "quality_balanced_nph_1.5": {
+      "split_strategy": "quality_balanced",
+      "seed": 913,
+      "min_quality": 1,
+      "noise_per_hum": 1.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "quality_balanced_nph_2": {
+      "split_strategy": "quality_balanced",
+      "seed": 914,
+      "min_quality": 1,
+      "noise_per_hum": 2,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+
+    "clipwise_balanced_nph_0.5": {
+      "split_strategy": "clipwise_balanced",
+      "seed": 1401,
+      "min_quality": 1,
+      "noise_per_hum": 0.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "clipwise_balanced_nph_1": {
+      "split_strategy": "clipwise_balanced",
+      "seed": 1402,
+      "min_quality": 1,
+      "noise_per_hum": 1,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "clipwise_balanced_nph_1.5": {
+      "split_strategy": "clipwise_balanced",
+      "seed": 1403,
+      "min_quality": 1,
+      "noise_per_hum": 1.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "clipwise_balanced_nph_2": {
+      "split_strategy": "clipwise_balanced",
+      "seed": 1404,
+      "min_quality": 1,
+      "noise_per_hum": 2,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+
+    "quality_and_clipwise_balanced_nph_0.5": {
+      "split_strategy": "quality_and_clipwise_balanced",
+      "seed": 2048,
+      "min_quality": 1,
+      "noise_per_hum": 0.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "quality_and_clipwise_balanced_nph_1": {
+      "split_strategy": "quality_and_clipwise_balanced",
+      "seed": 2049,
+      "min_quality": 1,
+      "noise_per_hum": 1,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "quality_and_clipwise_balanced_nph_1.5": {
+      "split_strategy": "quality_and_clipwise_balanced",
+      "seed": 2050,
+      "min_quality": 1,
+      "noise_per_hum": 1.5,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    },
+    "quality_and_clipwise_balanced_nph_2": {
+      "split_strategy": "quality_and_clipwise_balanced",
+      "seed": 2051,
+      "min_quality": 1,
+      "noise_per_hum": 2,
+      "noise_mining": { "margin_s": 0.1, "fallback_raw": true }
+    }
+  }
+}

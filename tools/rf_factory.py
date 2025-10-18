@@ -8,7 +8,7 @@ Usage
 -----
 python tools/rf_factory.py \
   --benchmark-root BENCHMARK \
-  --audio-root /…/alpaca-segmentation/data/benchmark_corpus_v1/labelled_recordings \
+  --audio-root AUDIO_ROOT = ${DATA_ROOT}/benchmark_corpus_v1/labelled_recordings
   --rf-model   /…/alpaca-segmentation/random_forest/models/rf_*.pkl \
   --rf-threshold 0.53 \
   --n-fft 2048 --hop 1024 --n-mfcc 13 --include-deltas
