@@ -4,9 +4,30 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
+# ───────────────────────── cleanup toggles ─────────────────────────
+DRYRUN ?= 0                 # set to 1 to just print what would be removed
+KEEP_CHECKPOINTS ?= 1       # per-run checkpoints to keep (newest N)
+KEEP_JOBLOGS ?= 100         # keep newest N job logs; delete older
+TB_WIPE ?= 1                # 1: delete all TensorBoard summaries; 0: keep
+
+ifeq ($(DRYRUN),1)
+RM    := echo rm -rf
+RMF   := echo rm -f
+RMDIR := echo rmdir
+FDELETE := echo 'find ... -delete'
+else
+RM    := rm -rf
+RMF   := rm -f
+RMDIR := rmdir
+FDELETE := true
+endif
+
 .PHONY: help env-check env-print training-configs training-submit train \
         benchmark-configs gpu-predict eval-batches eval-run \
-        rf-batches rf-run metrics clean-benchmark watch status
+        rf-batches rf-run metrics clean-benchmark watch status \
+        training-clean-logs training-clean-joblogs training-clean-summaries \
+        training-clean-checkpoints training-clean-cache training-clean-pyc \
+        training-clean-empty training-clean-all
 
 # ───────────────────────── helpers ─────────────────────────
 define ACTIVATED
@@ -23,7 +44,7 @@ endef
 # ───────────────────────── top-level ───────────────────────
 help: ## Show available targets
 	@echo "Targets:"; \
-	grep -E '^[a-zA-Z0-9._-]+:.*?##' Makefile | sort | awk -F':|##' '{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$3}'
+	grep -E '^[a-zA-Z0-9._-]+:.*?##' Makefile | sort | awk -F':|##' '{printf "  \033[36m%-28s\033[0m %s\n", $$1, $$3}'
 
 env-check: ## Validate .env is present
 	@$(ACTIVATED) echo "✔ .env loaded"
@@ -113,4 +134,73 @@ metrics: env-check ## Build combined metrics CSVs (baseline & RF)
 	 --per-tape-out BENCHMARK/metrics_per_tape.csv)
 
 clean-benchmark: env-check ## Purge BENCHMARK cfg/jobs/runs (careful!)
-	@$(ACTIVATED) rm -rf "$$BENCHMARK_ROOT/cfg/"* "$$BENCHMARK_ROOT/jobs/"* "$$BENCHMARK_ROOT/runs/"*
+	@$(ACTIVATED) $(RM) "$$BENCHMARK_ROOT/cfg" "$$BENCHMARK_ROOT/jobs" "$$BENCHMARK_ROOT/runs"
+
+# ─────────────────────── Training cleanup ──────────────────
+training-clean-logs: env-check ## Delete per-run training logs (TRAINING/runs/models/*/logs)
+	@$(ACTIVATED) \
+	ROOT="$$TRAINING_ROOT/models"; \
+	for RUN in "$$ROOT"/*; do \
+	  [[ -d "$$RUN/logs" ]] && echo "🧹 logs: $$RUN/logs" && $(RM) "$$RUN/logs"; \
+	done
+
+training-clean-joblogs: env-check ## Trim TRAINING/runs/job_logs to newest KEEP_JOBLOGS=$(KEEP_JOBLOGS)
+	@$(ACTIVATED) \
+	DIR="$$TRAINING_ROOT/job_logs"; \
+	[[ -d "$$DIR" ]] || exit 0; \
+	mapfile -t FILES < <(ls -1t "$$DIR"/* 2>/dev/null || true); \
+	KEEP="$(KEEP_JOBLOGS)"; \
+	i=0; \
+	for f in "$${FILES[@]}"; do \
+	  i=$$((i+1)); \
+	  if [[ $$i -gt $$KEEP ]]; then echo "🧹 joblog: $$f" && $(RMF) "$$f"; fi; \
+	done
+
+training-clean-summaries: env-check ## Remove all TensorBoard summaries (set TB_WIPE=0 to keep)
+	@$(ACTIVATED) \
+	if [[ "$(TB_WIPE)" != "1" ]]; then echo "↪ TB_WIPE=0, skipping summaries clean"; exit 0; fi; \
+	ROOT="$$TRAINING_ROOT/models"; \
+	for RUN in "$$ROOT"/*; do \
+	  [[ -d "$$RUN/summaries" ]] && echo "🧹 summaries: $$RUN/summaries" && $(RM) "$$RUN/summaries"; \
+	done
+
+training-clean-checkpoints: env-check ## Keep only the newest KEEP_CHECKPOINTS=$(KEEP_CHECKPOINTS) checkpoint(s) per run
+	@$(ACTIVATED) \
+	ROOT="$$TRAINING_ROOT/models"; \
+	KEEP="$(KEEP_CHECKPOINTS)"; \
+	for RUN in "$$ROOT"/*; do \
+	  CKP="$$RUN/checkpoints"; \
+	  [[ -d "$$CKP" ]] || continue; \
+	  mapfile -t CKPS < <(ls -1t "$$CKP"/* 2>/dev/null || true); \
+	  i=0; \
+	  for f in "$${CKPS[@]}"; do \
+	    i=$$((i+1)); \
+	    if [[ $$i -gt $$KEEP ]]; then echo "🧹 old ckpt: $$f" && $(RMF) "$$f"; fi; \
+	  done; \
+	  rmdir "$$CKP" 2>/dev/null || true; \
+	done
+
+training-clean-cache: env-check ## Delete spectrogram cache (TRAINING/runs/cache)
+	@$(ACTIVATED) \
+	[[ -d "$$TRAINING_ROOT/cache" ]] && echo "🧹 cache: $$TRAINING_ROOT/cache" && $(RM) "$$TRAINING_ROOT/cache" || true
+
+training-clean-pyc: env-check ## Remove __pycache__ and *.pyc across repo
+	@$(ACTIVATED) \
+	find "$$REPO_ROOT" -type d -name "__pycache__" -prune -exec $(RM) {} +; \
+	find "$$REPO_ROOT" -type f -name "*.pyc" -delete
+
+training-clean-empty: env-check ## Remove empty directories under TRAINING/runs/models
+	@$(ACTIVATED) \
+	ROOT="$$TRAINING_ROOT/models"; \
+	[[ -d "$$ROOT" ]] || exit 0; \
+	find "$$ROOT" -type d -empty -delete
+
+training-clean-all: ## Clean logs, joblogs, summaries, old checkpoints, cache, pyc, empty dirs
+	@$(MAKE) training-clean-logs
+	@$(MAKE) training-clean-joblogs
+	@$(MAKE) training-clean-summaries
+	@$(MAKE) training-clean-checkpoints
+	@$(MAKE) training-clean-cache
+	@$(MAKE) training-clean-pyc
+	@$(MAKE) training-clean-empty
+	@echo "✅ Training cleanup complete (DRYRUN=$(DRYRUN))"
