@@ -5,7 +5,7 @@ __pycache__/
 # Ignore virtual environments
 venv/
 env/
-.env/
+.env.*
 
 # Ignore JetBrains IDE project files (PyCharm, IntelliJ, etc.)
 .idea/

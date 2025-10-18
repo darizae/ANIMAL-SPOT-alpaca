@@ -16,8 +16,13 @@ RM := rm -rf
 RMF := rm -f
 endif
 
+# rsync controls for upload (tweak if needed)
+RSYNC ?= rsync
+RSYNC_FLAGS ?= -azP --partial
+EXCLUDE ?=
+
 .PHONY: help env-check env-print \
-        data-index data-prepare data-count data-upload \
+        data-index data-prepare data-count upload-training upload-benchmark \
         training-configs training-submit train watch status \
         benchmark-configs gpu-predict eval-batches eval-run \
         rf-batches rf-run metrics clean-benchmark \
@@ -52,6 +57,49 @@ env-print: ## Print important .env values
 	echo "MAMBA_EXE         = $$MAMBA_EXE"; \
 	echo "MAMBA_ENV_NAME    = $$MAMBA_ENV_NAME"
 
+
+# ───────────────────────── local data upload (runs on your laptop) ─────────────────────────
+# Reads ./.env.upload (repo-root) if present. Minimal knobs:
+#   UPLOAD_USER=<cluster_user>
+#   UPLOAD_HOST=glogin-gpu.hpc.gwdg.de
+#   UPLOAD_PATH=/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data
+# You can override any of these at runtime:  make upload CORPUS=training_corpus_v1 UPLOAD_USER=foo
+UPLOAD_ENV_FILE := .env.upload
+
+# rsync command (set DRYRUN=1 to preview)
+RSYNC := rsync -av --partial --progress
+ifeq ($(DRYRUN),1)
+  RSYNC += --dry-run
+endif
+
+# helper to load local upload env without touching HPC .env
+define LOAD_UPLOAD_ENV
+if [ -f "$(UPLOAD_ENV_FILE)" ]; then \
+  set -a; source "$(UPLOAD_ENV_FILE)"; set +a; \
+fi; \
+UPLOAD_USER="$${UPLOAD_USER:-$${USER}}"; \
+UPLOAD_HOST="$${UPLOAD_HOST:-glogin-gpu.hpc.gwdg.de}"; \
+UPLOAD_PATH="$${UPLOAD_PATH:-/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data}";
+endef
+
+.PHONY: upload upload-all
+
+upload: ## Upload one corpus folder to the cluster (make upload CORPUS=training_corpus_v1 | SRC=/abs/path)
+	@$(LOAD_UPLOAD_ENV) \
+	if [ -n "$(SRC)" ]; then SRC_DIR="$(SRC)"; \
+	elif [ -n "$(CORPUS)" ]; then SRC_DIR="$$(pwd)/data/$(CORPUS)"; \
+	else echo "✖ Set CORPUS=training_corpus_v1 (or benchmark_corpus_v1) OR SRC=/absolute/path"; exit 1; fi; \
+	[ -d "$$SRC_DIR" ] || { echo "✖ No such directory: $$SRC_DIR"; exit 1; }; \
+	BNAME="$$(basename "$$SRC_DIR")"; \
+	DEST="$$UPLOAD_USER@$$UPLOAD_HOST:$$UPLOAD_PATH/$$BNAME"; \
+	echo "⇪ Upload $$SRC_DIR  →  $$DEST"; \
+	ssh "$$UPLOAD_USER@$$UPLOAD_HOST" "mkdir -p '$$UPLOAD_PATH/$$BNAME'"; \
+	$(RSYNC) -e "ssh -T" "$$SRC_DIR/" "$$UPLOAD_USER@$$UPLOAD_HOST:$$UPLOAD_PATH/$$BNAME/"
+
+upload-all: ## Upload both corpora (training_corpus_v1 and benchmark_corpus_v1)
+	@$(MAKE) upload CORPUS=training_corpus_v1
+	@$(MAKE) upload CORPUS=benchmark_corpus_v1
+
 # ───────────────────────── data prep ─────────────────────────
 data-index: env-check ## Build corpus_index.json for a corpus: make data-index CORPUS=training_corpus_v1
 	@$(ACTIVATED) \
@@ -68,9 +116,6 @@ data-prepare: env-check ## Build dataset_* folders (optional PNGs): MAKEOPTS='--
 
 data-count: env-check ## Print counts for dataset_* in TRAINING_DATA_ROOT
 	@$(call MAMBA_PY,data_preprocessing/count_dataset_files.py)
-
-data-upload: ## Rsync a local corpus folder to cluster's repo data (uses .env REMOTE_* vars)
-	@./data_preprocessing/upload_datasets.sh "$(FOLDER)"
 
 # ───────────────────────── training ─────────────────────────
 training-configs: env-check ## Generate TRAINING configs + job array
