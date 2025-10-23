@@ -107,7 +107,7 @@ data-index: env-check ## Build corpus_index.json for a corpus: make data-index C
 	"$$MAMBA_EXE" run -n "$$MAMBA_ENV_NAME" python data_preprocessing/build_alpaca_index.py \
 	  "$$DATA_ROOT/$$CORPUS"
 
-data-prepare: env-check ## Build dataset_* folders (optional PNGs): MAKEOPTS='-- --generate_spectrograms' CORPUS=training_corpus_v1
+data-prepare: env-check ## Build dataset_* folders: MAKEOPTS='-- --generate_spectrograms' CORPUS=training_corpus_v1
 	@$(ACTIVATED) \
 	CORPUS="${CORPUS:?Set CORPUS=training_corpus_v1}"; \
 	EXTRA="${MAKEOPTS#-- }"; \
