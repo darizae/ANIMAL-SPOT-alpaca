@@ -1,21 +1,6 @@
 {
   "active_strategies": [
-    "random_nph_0.5",
-    "random_nph_1",
-    "random_nph_1.5",
-    "random_nph_2",
-    "quality_balanced_nph_0.5",
-    "quality_balanced_nph_1",
-    "quality_balanced_nph_1.5",
-    "quality_balanced_nph_2",
-    "clipwise_balanced_nph_0.5",
-    "clipwise_balanced_nph_1",
-    "clipwise_balanced_nph_1.5",
-    "clipwise_balanced_nph_2",
-    "quality_and_clipwise_balanced_nph_0.5",
-    "quality_and_clipwise_balanced_nph_1",
-    "quality_and_clipwise_balanced_nph_1.5",
-    "quality_and_clipwise_balanced_nph_2"
+    "clipwise_balanced_nph_2"
   ],
 
   "strategies": {

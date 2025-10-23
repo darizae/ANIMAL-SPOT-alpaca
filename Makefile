@@ -30,15 +30,41 @@ EXCLUDE ?=
         training-clean-checkpoints training-clean-cache training-clean-pyc \
         training-clean-empty training-clean-all
 
+# ───────────────────────── env helpers ─────────────────────────
 define ACTIVATED
 set -euo pipefail; \
 [ -f .env ] || { echo "❌ Missing .env at repo root"; exit 1; }; \
 set -a; source .env; set +a;
 endef
 
-define MAMBA_PY
+# Ensure repo-local venv Python exists and expose it as $$PY
+define WITH_VENV
 $(ACTIVATED) \
-"$$MAMBA_EXE" run -n "$$MAMBA_ENV_NAME" python $(1)
+PY="$$REPO_ROOT/.venv/bin/python"; \
+[ -x "$$PY" ] || { \
+  echo "❌ Python venv not found at: $$REPO_ROOT/.venv/bin/python"; \
+  echo "   From $$REPO_ROOT run:"; \
+  echo "     python3.11 -m venv .venv"; \
+  echo "     source .venv/bin/activate"; \
+  echo "     pip install -r requirements.txt"; \
+  exit 1; \
+}; \
+$(1)
+endef
+
+# Convenience wrapper to run a Python script with the venv interpreter
+define VENV_PY
+$(ACTIVATED) \
+PY="$$REPO_ROOT/.venv/bin/python"; \
+[ -x "$$PY" ] || { \
+  echo "❌ Python venv not found at: $$REPO_ROOT/.venv/bin/python"; \
+  echo "   From $$REPO_ROOT run:"; \
+  echo "     python3.11 -m venv .venv"; \
+  echo "     source .venv/bin/activate"; \
+  echo "     pip install -r requirements.txt"; \
+  exit 1; \
+}; \
+"$$PY" $(1)
 endef
 
 help: ## Show available targets
@@ -54,9 +80,8 @@ env-print: ## Print important .env values
 	echo "DATA_ROOT         = $$DATA_ROOT"; \
 	echo "TRAINING_DATA_ROOT= $$TRAINING_DATA_ROOT"; \
 	echo "BENCHMARK_ROOT    = $$BENCHMARK_ROOT"; \
-	echo "MAMBA_EXE         = $$MAMBA_EXE"; \
-	echo "MAMBA_ENV_NAME    = $$MAMBA_ENV_NAME"
-
+	echo "TRAINING_ROOT     = $$TRAINING_ROOT"; \
+	echo "VENV_PYTHON       = $$REPO_ROOT/.venv/bin/python"
 
 # ───────────────────────── local data upload (runs on your laptop) ─────────────────────────
 # Reads ./.env.upload (repo-root) if present. Minimal knobs:
@@ -104,22 +129,26 @@ upload-all: ## Upload both corpora (training_corpus_v1 and benchmark_corpus_v1)
 data-index: env-check ## Build corpus_index.json for a corpus: make data-index CORPUS=training_corpus_v1
 	@$(ACTIVATED) \
 	CORPUS="${CORPUS:?Set CORPUS=training_corpus_v1 or benchmark_corpus_v1}"; \
-	"$$MAMBA_EXE" run -n "$$MAMBA_ENV_NAME" python data_preprocessing/build_alpaca_index.py \
-	  "$$DATA_ROOT/$$CORPUS"
+	$(call VENV_PY,data_preprocessing/build_alpaca_index.py "$$DATA_ROOT/$$CORPUS")
 
-data-prepare: env-check ## Build dataset_* folders: MAKEOPTS='-- --generate_spectrograms' CORPUS=training_corpus_v1
-	@$(ACTIVATED) \
-	CORPUS="${CORPUS:?Set CORPUS=training_corpus_v1}"; \
-	EXTRA="${MAKEOPTS#-- }"; \
-	"$$MAMBA_EXE" run -n "$$MAMBA_ENV_NAME" python data_preprocessing/prepare_dataset.py \
-	  "$$DATA_ROOT/$$CORPUS" $$EXTRA
+data-prepare: env-check ## Build dataset_* folders: CORPUS=training_corpus_v1
+	@$(call WITH_VENV, \
+		CORPUS="${CORPUS:?Set CORPUS=training_corpus_v1}"; \
+		CORPUS_DIR="$$DATA_ROOT/$$CORPUS"; \
+		[ -d "$$CORPUS_DIR" ] || { echo "✖ No such corpus dir: $$CORPUS_DIR"; exit 1; }; \
+		if [ ! -f "$$CORPUS_DIR/corpus_index.json" ]; then \
+		  echo "ℹ️  corpus_index.json not found → building it first"; \
+		  "$$PY" data_preprocessing/build_alpaca_index.py "$$CORPUS_DIR"; \
+		fi; \
+		EXTRA="${MAKEOPTS#-- }"; \
+		"$$PY" data_preprocessing/prepare_dataset.py "$$CORPUS_DIR" $$EXTRA )
 
 data-count: env-check ## Print counts for dataset_* in TRAINING_DATA_ROOT
-	@$(call MAMBA_PY,data_preprocessing/count_dataset_files.py)
+	@$(call VENV_PY,data_preprocessing/count_dataset_files.py)
 
 # ───────────────────────── training ─────────────────────────
 training-configs: env-check ## Generate TRAINING configs + job array
-	@$(call MAMBA_PY,tools/training_factory.py)
+	@$(call VENV_PY,tools/training_factory.py)
 
 training-submit: env-check ## Submit training Slurm array
 	@$(ACTIVATED) sbatch TRAINING/jobs/train_models.sbatch
@@ -134,53 +163,53 @@ status: ## Show last 20 training job logs
 
 # ───────────────────────── benchmark ────────────────────────
 benchmark-configs: env-check ## Generate pred/eval cfgs + pred batches
-	@$(ACTIVATED) \
-	CORPUS_ROOT="${CORPUS_ROOT:-data/benchmark_corpus_v1}"; \
-	MAX_CONC="${MAX_CONC:-15}"; \
-	"$$MAMBA_EXE" run -n "$$MAMBA_ENV_NAME" python tools/benchmark_factory.py \
-	  --training-root "$$TRAINING_ROOT" \
-	  --benchmark-root "$$BENCHMARK_ROOT" \
-	  --corpus-base "$$BENCHMARK_CORPUS_BASE" \
-	  --corpus-root "$$CORPUS_ROOT" \
-	  --variants-json tools/benchmark_variants.json \
-	  --max-concurrent "$$MAX_CONC"
+	@$(call WITH_VENV, \
+		CORPUS_ROOT="${CORPUS_ROOT:-data/benchmark_corpus_v1}"; \
+		MAX_CONC="${MAX_CONC:-15}"; \
+		"$$PY" tools/benchmark_factory.py \
+		  --training-root "$$TRAINING_ROOT" \
+		  --benchmark-root "$$BENCHMARK_ROOT" \
+		  --corpus-base "$$BENCHMARK_CORPUS_BASE" \
+		  --corpus-root "$$CORPUS_ROOT" \
+		  --variants-json tools/benchmark_variants.json \
+		  --max-concurrent "$$MAX_CONC" )
 
 gpu-predict: env-check ## Submit all GPU prediction arrays
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/pred_models.batch"
 
 # ───────────────────────── evaluation ───────────────────────
 eval-batches: env-check ## Build CPU evaluation job arrays
-	@$(ACTIVATED) \
-	MAX_CONC="${MAX_CONC:-20}"; \
-	"$$MAMBA_EXE" run -n "$$MAMBA_ENV_NAME" python tools/eval_factory.py \
-	  --benchmark-root "$$BENCHMARK_ROOT" \
-	  --max-concurrent "$$MAX_CONC"
+	@$(call WITH_VENV, \
+		MAX_CONC="${MAX_CONC:-20}"; \
+		"$$PY" tools/eval_factory.py \
+		  --benchmark-root "$$BENCHMARK_ROOT" \
+		  --max-concurrent "$$MAX_CONC" )
 
 eval-run: env-check ## Submit CPU evaluation arrays (writes evaluation/index.json)
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/eval_models.batch"
 
 # ───────────────────────── RF post-proc ─────────────────────
 rf-batches: env-check ## Build RF cfgs + batch (set RF_MODEL=/path/to/model.pkl)
-	@$(ACTIVATED) \
-	AUDIO_ROOT_DEFAULT="$$DATA_ROOT/benchmark_corpus_v1/labelled_recordings"; \
-	AUDIO_ROOT="$${AUDIO_ROOT:-$$AUDIO_ROOT_DEFAULT}"; \
-	RF_MODEL="$${RF_MODEL:?Set RF_MODEL=/absolute/path/to/model.pkl}"; \
-	RF_THRESHOLD="$${RF_THRESHOLD:-0.70}"; \
-	DELTA_FLAG=""; [ "$${INCLUDE_DELTAS:-1}" = "1" ] && DELTA_FLAG="--include-deltas"; \
-	"$$MAMBA_EXE" run -n "$$MAMBA_ENV_NAME" python tools/rf_factory.py \
-	  --benchmark-root "$$BENCHMARK_ROOT" \
-	  --audio-root "$$AUDIO_ROOT" \
-	  --rf-model "$$RF_MODEL" \
-	  --rf-threshold "$$RF_THRESHOLD" \
-	  --n-fft 2048 --hop 1024 $$DELTA_FLAG \
-	  --max-concurrent "$${MAX_CONC:-20}"
+	@$(call WITH_VENV, \
+		AUDIO_ROOT_DEFAULT="$$DATA_ROOT/benchmark_corpus_v1/labelled_recordings"; \
+		AUDIO_ROOT="$${AUDIO_ROOT:-$$AUDIO_ROOT_DEFAULT}"; \
+		RF_MODEL="$${RF_MODEL:?Set RF_MODEL=/absolute/path/to/model.pkl}"; \
+		RF_THRESHOLD="$${RF_THRESHOLD:-0.70}"; \
+		DELTA_FLAG=""; [ "$${INCLUDE_DELTAS:-1}" = "1" ] && DELTA_FLAG="--include-deltas"; \
+		"$$PY" tools/rf_factory.py \
+		  --benchmark-root "$$BENCHMARK_ROOT" \
+		  --audio-root "$$AUDIO_ROOT" \
+		  --rf-model "$$RF_MODEL" \
+		  --rf-threshold "$$RF_THRESHOLD" \
+		  --n-fft 2048 --hop 1024 $$DELTA_FLAG \
+		  --max-concurrent "$${MAX_CONC:-20}" )
 
 rf-run: env-check ## Submit RF batch (CPU)
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/rf_runs.batch"
 
 # ───────────────────────── metrics & cleanup ────────────────
 metrics: env-check ## Build combined metrics CSVs (baseline & RF)
-	@$(call MAMBA_PY,tools/evaluate_benchmark.py \
+	@$(call VENV_PY,tools/evaluate_benchmark.py \
 	 --gt data/benchmark_corpus_v1/corpus_index.json \
 	 --runs BENCHMARK/runs \
 	 --iou 0.40 \
