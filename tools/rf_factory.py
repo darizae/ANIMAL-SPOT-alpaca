@@ -8,17 +8,21 @@ Usage
 -----
 python tools/rf_factory.py \
   --benchmark-root BENCHMARK \
-  --audio-root AUDIO_ROOT = ${DATA_ROOT}/benchmark_corpus_v1/labelled_recordings
+  --audio-root AUDIO_ROOT=${DATA_ROOT}/benchmark_corpus_v1/labelled_recordings
   --rf-model   /…/alpaca-segmentation/random_forest/models/rf_*.pkl \
   --rf-threshold 0.53 \
   --n-fft 2048 --hop 1024 --n-mfcc 13 --include-deltas
 """
+from __future__ import annotations
+
 from pathlib import Path
 import argparse, textwrap, os
 from jinja2 import Template
 
+
 # ───────────────────── .env loader ────────────────────────────────────────────
-def load_dotenv_from_repo():
+def load_dotenv_from_repo() -> Path:
+    """Load repo-root/.env into os.environ without overriding existing vars."""
     repo_root = Path(__file__).resolve().parents[1]
     env_path = repo_root / ".env"
     if env_path.exists():
@@ -29,6 +33,8 @@ def load_dotenv_from_repo():
             k, v = ln.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
     return repo_root
+
+
 REPO_ROOT = load_dotenv_from_repo()
 
 CFG_TMPL = Template(textwrap.dedent("""\
@@ -43,7 +49,8 @@ n_mfcc={{ n_mfcc }}
 include_deltas={{ include_deltas }}
 """))
 
-BATCH_TMPL = Template(textwrap.dedent("""#!/bin/bash
+# Slurm batch template (CPU) using repo-local .venv
+BATCH_TMPL = Template(textwrap.dedent(r"""#!/bin/bash
 #SBATCH --job-name=rf_all
 #SBATCH --partition={{ slurm_partition }}
 #SBATCH --nodes={{ slurm_nodes }}
@@ -52,19 +59,40 @@ BATCH_TMPL = Template(textwrap.dedent("""#!/bin/bash
 #SBATCH --time={{ slurm_rf_time }}
 #SBATCH --account={{ slurm_account }}
 #SBATCH --array=0-{{ n_cfgs_minus1 }}%{{ max_conc }}
-#SBATCH --output={{ jobs_dir }}/job_logs/rf_%x-%j.out
-#SBATCH --error={{ jobs_dir }}/job_logs/rf_%x-%j.err
+#SBATCH --output={{ jobs_dir }}/job_logs/rf_%x-%A_%a.out
+#SBATCH --error={{ jobs_dir }}/job_logs/rf_%x-%A_%a.err
 #SBATCH --chdir={{ repo_root }}
 
-export MAMBA_ROOT_PREFIX={{ mamba_root_prefix }}
-eval "$({{ mamba_exe }} shell hook -s bash)"
-micromamba activate {{ mamba_env_name }}
+set -euo pipefail
+
+# --- repo & env bootstrap (no mamba) ---
+export REPO_ROOT="{{ repo_root }}"
+if [[ -f "$REPO_ROOT/.env" ]]; then
+  set -a
+  source "$REPO_ROOT/.env"
+  set +a
+fi
+
+# Activate repo-local venv
+VENV_PY="$REPO_ROOT/.venv/bin/python"
+VENV_ACT="$REPO_ROOT/.venv/bin/activate"
+if [[ ! -x "$VENV_PY" ]]; then
+  echo "❌ Missing venv at $REPO_ROOT/.venv."
+  echo "   On a login node, run:"
+  echo "     cd $REPO_ROOT && python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  exit 1
+fi
+source "$VENV_ACT"
+PY="$VENV_PY"
+
+echo "Using python: $(which python)"
+python -c "import sys; print('sys.version:', sys.version)"
 
 CFG=( {% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %} )
-python {{ rf_infer_py }} "${CFG[$SLURM_ARRAY_TASK_ID]}"
+"$PY" "{{ rf_infer_py }}" "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """))
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--benchmark-root", default=os.getenv("BENCHMARK_ROOT", "BENCHMARK"),
                     help="Path to BENCHMARK")
@@ -84,8 +112,8 @@ def main():
     (jobs_dir / "job_logs").mkdir(parents=True, exist_ok=True)
 
     # discover model/variant pairs from cfg tree
-    eval_cfgs = sorted((cfg_root).glob("*/*/eval.cfg"))
-    rf_cfgs = []
+    eval_cfgs = sorted(cfg_root.glob("*/*/eval.cfg"))
+    rf_cfgs: list[Path] = []
     for eval_cfg in eval_cfgs:
         model = eval_cfg.parents[1].name
         variant = eval_cfg.parents[0].name
@@ -119,10 +147,7 @@ def main():
         jobs_dir=jobs_dir,
         repo_root=repo_root,
         rf_infer_py=str(rf_infer_py.resolve()),
-        # env
-        mamba_exe=os.getenv("MAMBA_EXE", "micromamba"),
-        mamba_root_prefix=os.getenv("MAMBA_ROOT_PREFIX", ""),
-        mamba_env_name=os.getenv("MAMBA_ENV_NAME", "animal-spot"),
+        # slurm env (overrides via .env allowed)
         slurm_partition=os.getenv("SLURM_PARTITION", "kisski"),
         slurm_nodes=int(os.getenv("SLURM_NODES", "1")),
         slurm_cpus=int(os.getenv("SLURM_CPUS", "8")),

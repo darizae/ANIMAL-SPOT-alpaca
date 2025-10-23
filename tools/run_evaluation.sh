@@ -24,17 +24,23 @@ BENCHMARK_ROOT="${BENCHMARK_ROOT:-${REPO_ROOT}/BENCHMARK}"
 EVAL_SCRIPT="${REPO_ROOT}/EVALUATION/start_evaluation.py"
 PRED_IDX_SCRIPT="${REPO_ROOT}/tools/build_pred_index.py"
 
-# ─── micromamba env ──────────────────────────────────────────────────────────
-export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-}"
-if [[ -n "${MAMBA_EXE:-}" ]]; then
-  eval "$(${MAMBA_EXE} shell hook --shell=bash)"
-else
-  # fallback to PATH-resolved micromamba
-  eval "$(micromamba shell hook --shell=bash)"
+VENV_ACT="${REPO_ROOT}/.venv/bin/activate"
+VENV_PY="${REPO_ROOT}/.venv/bin/python"
+
+if [[ ! -x "${VENV_PY}" ]]; then
+  echo "❌ Missing venv at ${REPO_ROOT}/.venv."
+  echo "   On a login node, run:"
+  echo "     cd ${REPO_ROOT} && python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  exit 1
 fi
-micromamba activate "${MAMBA_ENV_NAME:-animal-spot}"
+
+# shellcheck source=/dev/null
+source "${VENV_ACT}"
+PY="${VENV_PY}"
 
 echo "▶ Starting evaluation at $(date)"
+echo "   Using python: $(which python)"
+python -c "import sys; print('   sys.version:', sys.version)"
 
 # ─── iterate over every eval.cfg ──────────────────────────────────────────────
 find "${BENCHMARK_ROOT}/cfg" -type f -name eval.cfg | sort | while read -r CFG; do
@@ -47,10 +53,10 @@ find "${BENCHMARK_ROOT}/cfg" -type f -name eval.cfg | sort | while read -r CFG; 
   echo "─── Evaluating: ${RUN_ROOT}"
 
   # 1️⃣ evaluation
-  python "${EVAL_SCRIPT}" "${CFG}"
+  "${PY}" "${EVAL_SCRIPT}" "${CFG}"
 
   # 2️⃣ index build
-  python "${PRED_IDX_SCRIPT}" "${RUN_ROOT}"
+  "${PY}" "${PRED_IDX_SCRIPT}" "${RUN_ROOT}"
 done
 
 echo "✅ Finished all evaluations at $(date)"
