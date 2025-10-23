@@ -1,4 +1,4 @@
-## Alpaca Segmentation Pipeline Usage. Replace any placeholder of the project name by the actual project name, which is "kisski-alpaca-2". Absolutely do not change anything else from the README.
+## Alpaca Segmentation Pipeline Usage
 
 1. **GPU nodes** for the heavy training and prediction jobs.
 2. **CPU nodes (scc-cpu)** for the evaluation arrays — no GPU hours wasted.
@@ -9,19 +9,18 @@
 
 ## 🧱 Components
 
-| Step | What happens                                                                  | Where         | Tool / Command                                                                            | Repository                                                            |
-|------|-------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| -1   | Build **training datasets** for ANIMAL-SPOT                                   | local         | `python data_preprocessing/prepare_datasets.py <corpus> [--generate_spectrograms]`        | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
-|      |                                                                               |               |                                                                                           |                                                                       |
-| 0    | Generate **training** configs & job array                                     | login         | `python tools/training_factory.py`                                                        | ANIMAL-SPOT-alpaca                                                    |
-| 1    | Submit training jobs (GPU)                                                    | login → Slurm | `bash TRAINING/jobs/train_models.sbatch`                                                  | ANIMAL-SPOT-alpaca                                                    |
-| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files               | login         | `python tools/benchmark_factory.py …`                                                     | ANIMAL-SPOT-alpaca                                                    |
-| 3    | Submit prediction arrays                                                      | login → Slurm | `bash BENCHMARK/jobs/pred_models.batch`                                                   | ANIMAL-SPOT-alpaca                                                    |
-| 4    | Generate **CPU evaluation** job arrays                                        | login         | `python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20`             | ANIMAL-SPOT-alpaca                                                    |
-| 5    | Submit evaluation arrays (writes `evaluation/index.json`)                     | login → Slurm | `bash BENCHMARK/jobs/eval_models.batch`                                                   | ANIMAL-SPOT-alpaca                                                    |
-| 6    | **RF post-processing (GPU)** – auto feature extraction + Random-Forest filter | login         | `python tools/rf_factory.py …` → `bash BENCHMARK/jobs/rf_runs.batch`                      | ANIMAL-SPOT-alpaca                                                    |
-| 7    | **Compare metrics (baseline vs RF)**                                          | local         | `python tools/evaluate_benchmark.py --layer both …` → `jupyter lab data_postprocessing/…` | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
-|      |                                                                               |               |                                                                                           |                                                                       |
+| Step | What happens                                                                  | Where         | Tool / Command                                                                                 | Repository                                                            |
+| ---- | ----------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| -1   | Build **training datasets** for ANIMAL-SPOT                                   | login         | `make data-index CORPUS=…` → `make data-prepare CORPUS=training_corpus_v1` → `make data-count` | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
+|      |                                                                               |               |                                                                                                |                                                                       |
+| 0    | Generate **training** configs & job array                                     | login         | `make training-configs`                                                                        | ANIMAL-SPOT-alpaca                                                    |
+| 1    | Submit training jobs (GPU)                                                    | login → Slurm | `make training-submit`                                                                         | ANIMAL-SPOT-alpaca                                                    |
+| 2    | Generate **prediction** & **evaluation** cfgs + GPU batch files               | login         | `make benchmark-configs MAX_CONC=15` (optionally add `PREDICT_IN=…`)                           | ANIMAL-SPOT-alpaca                                                    |
+| 3    | Submit prediction arrays                                                      | login → Slurm | `make gpu-predict`                                                                             | ANIMAL-SPOT-alpaca                                                    |
+| 4    | Generate **CPU evaluation** job arrays                                        | login         | `make eval-batches MAX_CONC=20`                                                                | ANIMAL-SPOT-alpaca                                                    |
+| 5    | Submit evaluation arrays (writes `evaluation/index.json`)                     | login → Slurm | `make eval-run`                                                                                | ANIMAL-SPOT-alpaca                                                    |
+| 6    | **RF post-processing (GPU)** – auto feature extraction + Random-Forest filter | login         | `make rf-batches AUDIO_ROOT=… RF_MODEL=/path/to/model.pkl` → `make rf-run`                     | ANIMAL-SPOT-alpaca                                                    |
+| 7    | **Compare metrics (baseline vs RF)**                                          | login         | `make metrics`                                                                                 | [alpaca-segmentation](https://github.com/darizae/alpaca-segmentation) |
 
 ---
 
@@ -30,7 +29,7 @@
 #### 0) Go to the project space
 
 ```bash
-cd /projects/extern/kisski/kisski-alpaca-2/dir.project
+cd /projects/extern/kisski-alpaca-2/dir.project
 ```
 
 #### 1) Go to the ANIMAL-SPOT-alpaca repo
@@ -42,10 +41,16 @@ cd repos/ANIMAL-SPOT-alpaca
 #### 2) Create and activate a Python 3.11 virtual environment, then install deps
 
 ```bash
-# from: /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
+# from: /projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+(Optional) Verify environment + paths:
+
+```bash
+make env-print
 ```
 
 ### 3) Git user (in this HPC env)
@@ -63,8 +68,8 @@ git config --global pull.rebase false
 Clone repo:
 
 ```bash
-mkdir -p /projects/extern/kisski/kisski-alpaca-2/dir.project/repos
-cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos
+mkdir -p /projects/extern/kisski-alpaca-2/dir.project/repos
+cd /projects/extern/kisski-alpaca-2/dir.project/repos
 git clone https://github.com/darizae/ANIMAL-SPOT-alpaca.git
 cd ANIMAL-SPOT-alpaca
 ```
@@ -72,7 +77,7 @@ cd ANIMAL-SPOT-alpaca
 Where everything should live:
 
 ```
-/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/
+/projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/
   data/                                   # all corpora live here
     training_corpus_v1/
     benchmark_corpus_v1/
@@ -89,7 +94,7 @@ Where everything should live:
 ### -1️⃣  Prepare training datasets
 
 ```bash
-cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
+cd /projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
 # 1) Build corpus index (training/benchmark)
 make data-index CORPUS=training_corpus_v1
@@ -112,7 +117,7 @@ Creates:
 Data lands here on KISSKI:
 
 ```
-/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data/
+/projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data/
 ```
 
 ---
@@ -174,9 +179,8 @@ chmod +x data_preprocessing/upload_datasets.sh
 ### 0️⃣  Build training configs and Slurm array
 
 ```bash
-cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
-
-python tools/training_factory.py
+cd /projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
+make training-configs
 ```
 
 Creates:
@@ -188,7 +192,7 @@ Creates:
 Each training variant is auto-generated based on the folders found under:
 
 ```bash
-/projects/extern/kisski/kisski-alpaca-2/dir.project/alpaca-segmentation/data
+/projects/extern/kisski-alpaca-2/dir.project/alpaca-segmentation/data
 ```
 
 (You can override this path using `--data_root`)
@@ -224,7 +228,7 @@ The `active_variants` list determines which variants will be built into configs 
 ### 1️⃣  Launch training array (GPU)
 
 ```bash
-sbtach TRAINING/jobs/train_models.sbatch
+sbatch TRAINING/jobs/train_models.sbatch
 watch -n 1 squeue -u $USER
 ```
 
@@ -244,12 +248,17 @@ Outputs go to:
 ### 2️⃣  Setup & prediction cfgs
 
 ```bash
-cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
+cd /projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
-python tools/benchmark_factory.py \
-  --corpus-root data/benchmark_corpus_v1 \
-  --variants-json tools/benchmark_variants.json \
-  --max-concurrent 15
+# Default (uses benchmark corpus labelled_recordings)
+make benchmark-configs MAX_CONC=15
+
+# Optional: point prediction to a custom directory (repo-relative or absolute)
+make benchmark-configs MAX_CONC=15 \
+  PREDICT_IN=data/training_corpus_v1/raw_recordings
+# (Absolute example)
+# make benchmark-configs MAX_CONC=15 \
+#   PREDICT_IN=/projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data/training_corpus_v1/raw_recordings
 ```
 
 Creates:
@@ -277,7 +286,7 @@ Global job parameters such as partition, GPU/CPU count, memory, and account are 
 ### 3️⃣  Launch GPU predictions
 
 ```bash
-bash BENCHMARK/jobs/pred_models.batch
+make gpu-predict
 watch -n 1 squeue -u $USER
 ```
 
@@ -286,7 +295,7 @@ watch -n 1 squeue -u $USER
 ### 4️⃣  Build CPU evaluation arrays
 
 ```bash
-python tools/eval_factory.py --benchmark-root BENCHMARK --max-concurrent 20
+make eval-batches MAX_CONC=20
 ```
 
 Outputs one `.batch` per model under `BENCHMARK/jobs/` **plus** a master launcher.
@@ -296,7 +305,7 @@ Outputs one `.batch` per model under `BENCHMARK/jobs/` **plus** a master launche
 ### 5️⃣  Launch evaluations (CPU)
 
 ```bash
-bash BENCHMARK/jobs/eval_models.batch
+make eval-run
 ```
 
 Each array task:
@@ -350,17 +359,14 @@ postrf/
 The factory creates one `rf.cfg` per model×variant and a Slurm array to run them on CPU.
 
 ```bash
-cd /projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
+cd /projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca
 
 # Build cfgs + batch (ALWAYS extracts ALL features; no feature toggle)
-python tools/rf_factory.py \
-  --benchmark-root BENCHMARK \
-  --audio-root path/to/labelled/recordings \
-  --rf-model  path/to/random-forest/model.pkl \
-  --n-fft 2048 --hop 1024 --include-deltas
+make rf-batches AUDIO_ROOT=/projects/extern/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data/benchmark_corpus_v1/labelled_recordings \
+                RF_MODEL=/absolute/path/to/random_forest_model.pkl
 
 # Launch CPU array
-bash BENCHMARK/jobs/rf_runs.batch
+make rf-run
 ```
 
 > The factory writes `rf.cfg` alongside each `eval.cfg` and calls
@@ -375,13 +381,7 @@ se the evaluator that supports **`--layer`**:
 * With `--layer both` the CSV contains both, tagged by a `layer` column.
 
 ```bash
-python tools/evaluate_benchmark.py \
-  --gt   data/benchmark_corpus_v1/corpus_index.json \
-  --runs BENCHMARK/runs \
-  --iou  0.40 \
-  --layer both \
-  --out  BENCHMARK/metrics.csv \
-  --per-tape-out BENCHMARK/metrics_per_tape.csv
+make metrics
 ```
 
 Then open the side-by-side notebook:
@@ -399,5 +399,5 @@ jupyter lab data_postprocessing/metrics_analysis.ipynb
 * ✅ Purge old benchmark data if needed:
 
 ```bash
-rm -rf BENCHMARK/cfg/* BENCHMARK/jobs/* BENCHMARK/runs/*
+make clean-benchmark
 ```
