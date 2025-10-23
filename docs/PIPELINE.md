@@ -35,20 +35,82 @@ cd /projects/extern/kisski/kisski-alpaca-2/dir.project
 
 ### 1) micromamba (install + shell hook)
 
-```bash
-mkdir -p tools
-curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
-  | tar -xvj -C tools bin/micromamba
+Awesome — since it’s working now, let’s make it **idiot-proof for everyone** who uses this project and document it cleanly.
 
-sed -i '/^exit$/d' ~/.bashrc
-{
-  echo '# micromamba (project-local)'
-  echo 'export MAMBA_ROOT_PREFIX=/projects/extern/kisski/kisski-alpaca-2/dir.project/mamba'
-  echo 'eval "$(/projects/extern/kisski/kisski-alpaca-2/dir.project/tools/bin/micromamba shell hook -s bash)"'
-} >> ~/.bashrc
-source ~/.bashrc
-type micromamba
+Below is what you should **add to the README** (without changing anything else). It creates a **project-local init script** that any user can source to get micromamba + the right root prefix, and it shows copy-paste commands for both interactive shells and Slurm jobs.
+
+---
+
+### Universal micromamba activation for **all** users (copy-paste)
+
+> Project: **kisski-alpaca-2**
+> Project path: `/projects/extern/kisski/kisski-alpaca-2/dir.project`
+
+**One-time, on KISSKI (run as any project member): create a shared init script**
+
+```bash
+# create a shared init script in the project space
+cat >/projects/extern/kisski/kisski-alpaca-2/dir.project/tools/mamba-init.sh <<'EOF'
+export MAMBA_ROOT_PREFIX=/projects/extern/kisski/kisski-alpaca-2/dir.project/mamba
+eval "$(/projects/extern/kisski/kisski-alpaca-2/dir.project/tools/bin/micromamba shell hook -s bash)"
+EOF
+chmod +x /projects/extern/kisski/kisski-alpaca-2/dir.project/tools/mamba-init.sh
 ```
+
+**Each user: enable it permanently in your shell**
+
+```bash
+# add a single source line to your ~/.bashrc
+grep -q 'mamba-init.sh' ~/.bashrc || echo 'source /projects/extern/kisski/kisski-alpaca-2/dir.project/tools/mamba-init.sh' >> ~/.bashrc
+
+# load it now (no need to relogin)
+source ~/.bashrc
+
+# verify the env root and envs (should show the project path)
+micromamba env list
+```
+
+**Activate the project env (every session)**
+
+```bash
+micromamba activate animal-spot
+```
+
+**If the env doesn’t exist for you yet, create it (once)**
+
+```bash
+micromamba create -y -n animal-spot python=3.11
+micromamba activate animal-spot
+micromamba install -y pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+micromamba install -y librosa scikit-image soundfile matplotlib pillow six opencv tqdm pandas tensorboardx
+```
+
+**Use inside Slurm batch scripts (top of the file)**
+
+```bash
+# make the micromamba function available in batch shells
+source /projects/extern/kisski/kisski-alpaca-2/dir.project/tools/mamba-init.sh
+micromamba activate animal-spot
+```
+
+**Quick sanity check**
+
+```bash
+micromamba env list
+python -c "import sys, torch; print(sys.executable); print('CUDA avail:', torch.cuda.is_available())"
+```
+
+**Example successful session**
+
+```bash
+export MAMBA_ROOT_PREFIX=/projects/extern/kisski/kisski-alpaca-2/dir.project/mamba
+eval "$(/projects/extern/kisski/kisski-alpaca-2/dir.project/tools/bin/micromamba shell hook -s bash)"
+micromamba env list
+micromamba activate animal-spot
+```
+
+That’s it. With the shared `mamba-init.sh` in the project and a single `source` line in each user’s `~/.bashrc`, **everyone** gets the correct micromamba function and root prefix automatically, and `micromamba activate animal-spot` “just works” in interactive shells and Slurm jobs.
+
 
 ### 2) Create env (GPU-ready)
 
