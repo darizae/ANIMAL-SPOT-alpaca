@@ -127,7 +127,7 @@ def main():
         slurm_nodes=int(os.getenv("SLURM_NODES", "1")),
         slurm_cpus=int(os.getenv("SLURM_CPUS", "8")),
         slurm_rf_time=os.getenv("SLURM_RF_TIME", "00:10:00"),
-        slurm_account=os.getenv("SLURM_ACCOUNT", "kisski-dpz-alpaca-hum"),
+        slurm_account=os.getenv("SLURM_ACCOUNT", "kisski-alpaca-2"),
     )
     batch_path = jobs_dir / "rf_all.batch"
     batch_path.write_text(batch_txt)

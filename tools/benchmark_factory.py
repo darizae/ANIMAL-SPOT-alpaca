@@ -165,7 +165,7 @@ def main(args):
             slurm_cpus=int(os.getenv("SLURM_CPUS", "8")),
             slurm_constraint=os.getenv("SLURM_CONSTRAINT", ""),
             slurm_pred_time=os.getenv("SLURM_PRED_TIME", "01:00:00"),
-            slurm_account=os.getenv("SLURM_ACCOUNT", "kisski-dpz-alpaca-hum"),
+            slurm_account=os.getenv("SLURM_ACCOUNT", "kisski-alpaca-2"),
         )
         (jobs_dir / f"pred_{model_name}.batch").write_text(pred_batch)
         pred_batches.append(jobs_dir / f"pred_{model_name}.batch")
