@@ -164,15 +164,18 @@ status: ## Show last 20 training job logs
 # ───────────────────────── benchmark ────────────────────────
 benchmark-configs: env-check ## Generate pred/eval cfgs + pred batches
 	@$(call WITH_VENV, \
-		CORPUS_ROOT="${CORPUS_ROOT:-data/benchmark_corpus_v1}"; \
-		MAX_CONC="${MAX_CONC:-15}"; \
+		CORPUS_ROOT="$${CORPUS_ROOT:-data/benchmark_corpus_v1}"; \
+		MAX_CONC="$${MAX_CONC:-15}"; \
+		EXTRA=""; \
+		if [ -n "$${PREDICT_IN:-}" ]; then EXTRA="--predict-in \"$${PREDICT_IN}\""; fi; \
 		"$$PY" tools/benchmark_factory.py \
 		  --training-root "$$TRAINING_ROOT" \
 		  --benchmark-root "$$BENCHMARK_ROOT" \
 		  --corpus-base "$$BENCHMARK_CORPUS_BASE" \
 		  --corpus-root "$$CORPUS_ROOT" \
 		  --variants-json tools/benchmark_variants.json \
-		  --max-concurrent "$$MAX_CONC" )
+		  --max-concurrent "$$MAX_CONC" \
+		  $$EXTRA )
 
 gpu-predict: env-check ## Submit all GPU prediction arrays
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/pred_models.batch"
@@ -180,7 +183,7 @@ gpu-predict: env-check ## Submit all GPU prediction arrays
 # ───────────────────────── evaluation ───────────────────────
 eval-batches: env-check ## Build CPU evaluation job arrays
 	@$(call WITH_VENV, \
-		MAX_CONC="${MAX_CONC:-20}"; \
+		MAX_CONC="$${MAX_CONC:-20}"; \
 		"$$PY" tools/eval_factory.py \
 		  --benchmark-root "$$BENCHMARK_ROOT" \
 		  --max-concurrent "$$MAX_CONC" )
