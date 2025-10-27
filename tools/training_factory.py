@@ -12,10 +12,17 @@ import argparse
 import json
 import os
 import textwrap
+
+import argparse
+import json
+import os
+import textwrap
 from pathlib import Path
 
 
+
 # ───────────────────── .env loader ────────────────────────────────────────────
+def load_dotenv_from_repo() -> Path:
 def load_dotenv_from_repo() -> Path:
     repo_root = Path(__file__).resolve().parents[1]
     env_path = repo_root / ".env"
@@ -73,6 +80,11 @@ fmax=4000
 # - exports REPO_ROOT (so scripts relying on it work even before sourcing .env)
 # - sources repo .env (TRAINING_ROOT, DATA_ROOT, etc.)
 # - activates repo .venv and uses its python explicitly
+# Slurm script header:
+# - cd's into repo
+# - exports REPO_ROOT (so scripts relying on it work even before sourcing .env)
+# - sources repo .env (TRAINING_ROOT, DATA_ROOT, etc.)
+# - activates repo .venv and uses its python explicitly
 SBATCH_HEADER = """\
 #!/bin/bash
 #SBATCH --job-name=animalspot_train
@@ -119,7 +131,9 @@ python -c "import torch, torchvision; print('torch', torch.__version__, 'cuda', 
 
 CONFIGS=({config_paths})
 "$PY" "{repo_root}/TRAINING/start_training.py" "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}}"
+"$PY" "{repo_root}/TRAINING/start_training.py" "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}}"
 """
+
 
 
 def main():
@@ -129,16 +143,24 @@ def main():
         type=Path,
         default=None,
         help="Root containing dataset_<variant> folders (overrides .env/JSON).",
+        help="Root containing dataset_<variant> folders (overrides .env/JSON).",
     )
     args = parser.parse_args()
 
     repo_root = Path(os.getenv("REPO_ROOT", REPO_ROOT)).resolve()
 
+
     json_path = repo_root / "tools" / "train_variants.json"
+    if not json_path.exists():
+        raise FileNotFoundError(f"Missing training variants JSON: {json_path}")
     if not json_path.exists():
         raise FileNotFoundError(f"Missing training variants JSON: {json_path}")
     cfg = json.loads(json_path.read_text())
     g = cfg["globals"]
+
+    # Apply .env (or CLI) overrides
+    g["src_dir"] = os.getenv("SRC_DIR", g.get("src_dir", str(repo_root / "ANIMAL-SPOT")))
+    runs_root = Path(os.getenv("TRAINING_ROOT", os.getenv("TRAINING_RUNS_ROOT", g["runs_root"]))).resolve()
 
     # Apply .env (or CLI) overrides
     g["src_dir"] = os.getenv("SRC_DIR", g.get("src_dir", str(repo_root / "ANIMAL-SPOT")))
@@ -149,10 +171,26 @@ def main():
     else:
         env_data_root = os.getenv("TRAINING_DATA_ROOT")
         data_root = Path(env_data_root) if env_data_root else Path(g["data_root"])
+        env_data_root = os.getenv("TRAINING_DATA_ROOT")
+        data_root = Path(env_data_root) if env_data_root else Path(g["data_root"])
 
+    # Ensure job_logs dir
     # Ensure job_logs dir
     (runs_root / "job_logs").mkdir(parents=True, exist_ok=True)
 
+    # Discover datasets: dataset_* folders under data_root
+    data_root = Path(data_root).resolve()
+    if not data_root.exists():
+        raise FileNotFoundError(f"TRAINING_DATA_ROOT not found: {data_root}")
+
+    dataset_folders = sorted(
+        [p for p in data_root.iterdir() if p.is_dir() and p.name.startswith("dataset_")]
+    )
+    if not dataset_folders:
+        raise RuntimeError(f"No dataset_* folders found under {data_root}")
+
+    # Write per-variant config files
+    config_paths: list[Path] = []
     # Discover datasets: dataset_* folders under data_root
     data_root = Path(data_root).resolve()
     if not data_root.exists():
@@ -186,6 +224,7 @@ def main():
         config_paths.append(cfg_path)
 
     # Slurm parameters (allow env overrides)
+    # Slurm parameters (allow env overrides)
     sl = g["slurm"]
     partition = os.getenv("SLURM_PARTITION", sl["partition"])
     nodes = os.getenv("SLURM_NODES", str(sl["nodes"]))
@@ -208,14 +247,26 @@ def main():
         cpus=cpus,
         time=time,
         account=account,
+        partition=partition,
+        nodes=nodes,
+        gpus=gpus,
+        cpus=cpus,
+        time=time,
+        account=account,
         runs_root=runs_root,
         repo_root=repo_root,
+        max_idx=total - 1,
+        concurrency=concurrency,
         max_idx=total - 1,
         concurrency=concurrency,
         config_paths=" ".join(str(p) for p in config_paths),
     )
 
+
     jobs_dir = repo_root / "TRAINING" / "jobs"
+    jobs_dir.mkdir(parents=True, exist_ok=True)
+    sbatch_path = jobs_dir / "train_models.sbatch"
+    sbatch_path.write_text(sbatch_txt)
     jobs_dir.mkdir(parents=True, exist_ok=True)
     sbatch_path = jobs_dir / "train_models.sbatch"
     sbatch_path.write_text(sbatch_txt)
@@ -223,6 +274,8 @@ def main():
     print(f"✔ Generated {len(config_paths)} cfg files and Slurm job array script:")
     for p in config_paths:
         print("  ", p.relative_to(repo_root))
+    print("  ", sbatch_path.relative_to(repo_root))
+
     print("  ", sbatch_path.relative_to(repo_root))
 
 

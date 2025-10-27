@@ -12,9 +12,12 @@ python tools/benchmark_factory.py \
 """
 from __future__ import annotations
 
+from __future__ import annotations
+
 from pathlib import Path
 import argparse, json, textwrap, os
 from jinja2 import Template
+
 
 # ───────────────────── .env loader ────────────────────────────────────────────
 def load_dotenv_from_repo() -> Path:
@@ -110,6 +113,8 @@ CFG=({% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
 """)
 
 # ───────────────────── default roots on the HPC (from .env) ─────────────────
+# NOTE: TRAINING_ROOT in your .env points to .../TRAINING/runs
+DEFAULT_TRAINING_ROOT = Path(os.getenv("TRAINING_ROOT", REPO_ROOT / "TRAINING" / "runs")).resolve()
 # NOTE: TRAINING_ROOT in your .env points to .../TRAINING/runs
 DEFAULT_TRAINING_ROOT = Path(os.getenv("TRAINING_ROOT", REPO_ROOT / "TRAINING" / "runs")).resolve()
 DEFAULT_BENCHMARK_ROOT = Path(os.getenv("BENCHMARK_ROOT", REPO_ROOT / "BENCHMARK")).resolve()
@@ -243,6 +248,7 @@ def main(args: argparse.Namespace) -> None:
     master = jobs_dir / "pred_models.batch"
     master.write_text("#!/bin/bash\n" + "".join(f"sbatch {b}\n" for b in sorted(pred_batches)))
     print(f"📝 wrote {master}  ({len(pred_batches)} arrays)")
+
 
 
 if __name__ == "__main__":
