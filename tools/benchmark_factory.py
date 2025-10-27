@@ -16,7 +16,9 @@ from pathlib import Path
 import argparse, json, textwrap, os
 from jinja2 import Template
 
+# ───────────────────── .env loader ────────────────────────────────────────────
 def load_dotenv_from_repo() -> Path:
+    """Load repo-root/.env into os.environ without overriding existing vars."""
     repo_root = Path(__file__).resolve().parents[1]
     env_path = repo_root / ".env"
     if env_path.exists():
@@ -27,6 +29,7 @@ def load_dotenv_from_repo() -> Path:
             k, v = ln.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
     return repo_root
+
 
 REPO_ROOT = load_dotenv_from_repo()
 
@@ -86,11 +89,13 @@ if [[ -f "$REPO_ROOT/.env" ]]; then
   set +a
 fi
 
+# Activate repo-local venv
 VENV_PY="$REPO_ROOT/.venv/bin/python"
 VENV_ACT="$REPO_ROOT/.venv/bin/activate"
 if [[ ! -x "$VENV_PY" ]]; then
   echo "❌ Missing venv at $REPO_ROOT/.venv."
-  echo "   cd $REPO_ROOT && python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  echo "   On a login node, run:"
+  echo "     cd $REPO_ROOT && python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
   exit 1
 fi
 source "$VENV_ACT"
@@ -104,6 +109,8 @@ CFG=({% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %})
 "$PY" PREDICTION/start_prediction.py "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """)
 
+# ───────────────────── default roots on the HPC (from .env) ─────────────────
+# NOTE: TRAINING_ROOT in your .env points to .../TRAINING/runs
 DEFAULT_TRAINING_ROOT = Path(os.getenv("TRAINING_ROOT", REPO_ROOT / "TRAINING" / "runs")).resolve()
 DEFAULT_BENCHMARK_ROOT = Path(os.getenv("BENCHMARK_ROOT", REPO_ROOT / "BENCHMARK")).resolve()
 DEFAULT_SRC_DIR = Path(os.getenv("SRC_DIR", REPO_ROOT / "ANIMAL-SPOT")).resolve()
@@ -163,9 +170,11 @@ def main(args: argparse.Namespace) -> None:
         corpus_root = (corpus_base / args.corpus_root).resolve()
         predict_in = corpus_root / "labelled_recordings"
 
+    # Load variants and resolve source dir
     variants = json.loads(Path(args.variants_json).read_text())
     src_dir = Path(args.src_dir or DEFAULT_SRC_DIR).resolve()
 
+    # Create base folders
     (bench_root / "cfg").mkdir(parents=True, exist_ok=True)
     jobs_dir = bench_root / "jobs"
     jobs_dir.mkdir(exist_ok=True)
@@ -180,7 +189,8 @@ def main(args: argparse.Namespace) -> None:
 
     pred_batches: list[Path] = []
     for model_pk in model_files:
-        variant_dir = model_pk.parent.parent if model_pk.parent.name in ("models","checkpoints") else model_pk.parent.parent
+        # variant directory is the parent of {models,checkpoints}
+        variant_dir = model_pk.parent.parent
         model_name = variant_dir.name
 
         pred_cfgs: list[Path] = []
@@ -204,11 +214,13 @@ def main(args: argparse.Namespace) -> None:
             ))
             pred_cfgs.append(pred_cfg_path)
 
+            # EVALUATION cfg (used later by eval batches)
             eval_cfg_path = cfg_dir / "eval.cfg"
             eval_cfg_path.write_text(EVAL_CFG_TMPL.render(
                 out_root=out_root, threshold=var['threshold']
             ))
 
+        # ─── batch file per model (uses .venv) ───────────────────────────────
         pred_batch_txt = PRED_BATCH_TMPL.render(
             model=model_name,
             n_cfgs_minus1=len(pred_cfgs) - 1,
@@ -231,6 +243,7 @@ def main(args: argparse.Namespace) -> None:
     master = jobs_dir / "pred_models.batch"
     master.write_text("#!/bin/bash\n" + "".join(f"sbatch {b}\n" for b in sorted(pred_batches)))
     print(f"📝 wrote {master}  ({len(pred_batches)} arrays)")
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
