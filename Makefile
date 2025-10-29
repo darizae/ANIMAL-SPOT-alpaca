@@ -204,6 +204,11 @@ rf-batches: env-check ## Build RF cfgs + batch (no args; auto-discovers everythi
 rf-run: env-check ## Submit RF batch (CPU)
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/rf_runs.batch"
 
+# ───────────────────────── extract clips ────────────────
+
+clips: env-check ## Extract WAV clips from indices (STAGE=postrf|evaluation, PAD_S=0.0)
+	@$(call VENV_PY,tools/extract_clips.py $$BENCHMARK_ROOT/runs --stage $${STAGE:-postrf} --pad-s $${PAD_S:-0.0})
+
 # ───────────────────────── metrics & cleanup ────────────────
 metrics: env-check ## Build combined metrics CSVs (baseline & RF)
 	@$(call VENV_PY,tools/evaluate_benchmark.py \
