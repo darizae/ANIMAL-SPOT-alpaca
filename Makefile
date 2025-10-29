@@ -192,20 +192,9 @@ eval-run: env-check ## Submit CPU evaluation arrays (writes evaluation/index.jso
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/eval_models.batch"
 
 # ───────────────────────── RF post-proc ─────────────────────
-rf-batches: env-check ## Build RF cfgs + batch (set RF_MODEL=/path/to/model.pkl)
+rf-batches: env-check ## Build RF cfgs + batch (no args; auto-discovers everything)
 	@$(call WITH_VENV, \
-		AUDIO_ROOT_DEFAULT="$$DATA_ROOT/benchmark_corpus_v1/labelled_recordings"; \
-		AUDIO_ROOT="$${AUDIO_ROOT:-$$AUDIO_ROOT_DEFAULT}"; \
-		RF_MODEL="$${RF_MODEL:?Set RF_MODEL=/absolute/path/to/model.pkl}"; \
-		RF_THRESHOLD="$${RF_THRESHOLD:-0.70}"; \
-		DELTA_FLAG=""; [ "$${INCLUDE_DELTAS:-1}" = "1" ] && DELTA_FLAG="--include-deltas"; \
-		"$$PY" tools/rf_factory.py \
-		  --benchmark-root "$$BENCHMARK_ROOT" \
-		  --audio-root "$$AUDIO_ROOT" \
-		  --rf-model "$$RF_MODEL" \
-		  --rf-threshold "$$RF_THRESHOLD" \
-		  --n-fft 2048 --hop 1024 $$DELTA_FLAG \
-		  --max-concurrent "$${MAX_CONC:-20}" )
+		"$$PY" tools/rf_factory.py )
 
 rf-run: env-check ## Submit RF batch (CPU)
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/rf_runs.batch"
