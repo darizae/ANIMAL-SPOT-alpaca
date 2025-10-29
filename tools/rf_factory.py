@@ -59,7 +59,8 @@ DEFAULT_ALPACA_REPO_ROOT = Path(
         "/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca",
     )
 ).resolve()
-DEFAULT_RF_MODELS_ROOT = Path(os.getenv("RF_MODELS_ROOT", DEFAULT_ALPACA_REPO_ROOT / "RANDOM_FOREST" / "models")).resolve()
+DEFAULT_RF_MODELS_ROOT = Path(
+    os.getenv("RF_MODELS_ROOT", DEFAULT_ALPACA_REPO_ROOT / "RANDOM_FOREST" / "models")).resolve()
 
 # ───────────────────── templates ──────────────────────────────────────────────
 CFG_TMPL = Template(textwrap.dedent("""\
@@ -90,7 +91,6 @@ BATCH_TMPL = Template(textwrap.dedent(r"""#!/bin/bash
 
 set -euo pipefail
 
-# --- repo & env bootstrap (no mamba) ---
 export REPO_ROOT="{{ repo_root }}"
 if [[ -f "$REPO_ROOT/.env" ]]; then
   set -a
@@ -117,7 +117,20 @@ CFG=( {% for c in cfgs %}"{{ c }}"{% if not loop.last %} {% endif %}{% endfor %}
 "$PY" "{{ rf_infer_py }}" "${CFG[$SLURM_ARRAY_TASK_ID]}"
 """))
 
+
 # ───────────────────── helpers ────────────────────────────────────────────────
+
+def parse_kv_cfg(path: Path) -> dict[str, str]:
+    kv = {}
+    for ln in path.read_text().splitlines():
+        ln = ln.strip()
+        if not ln or ln.startswith("#") or "=" not in ln:
+            continue
+        k, v = ln.split("=", 1)
+        kv[k.strip()] = v.strip().strip('"')
+    return kv
+
+
 def _pick_rf_model(models_dir: Path, explicit_model: Optional[Path] = None) -> Path:
     """
     Choose the RF model file.

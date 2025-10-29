@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Create prediction & evaluation config files + sbatch scripts for every trained model
-and every benchmark-variant (venv-based; no mamba).
+and every benchmark-variant
 
 Usage
 -----
