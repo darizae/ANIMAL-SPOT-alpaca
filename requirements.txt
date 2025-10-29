@@ -12,3 +12,4 @@ tensorboardX==2.6.4
 torch==2.4.0
 torchvision==0.19.0
 tqdm==4.67.1
+scikit-learn==1.6.1
