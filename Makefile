@@ -168,19 +168,19 @@ benchmark-configs: env-check ## Generate pred/eval cfgs + pred batches
 		MAX_CONC="$${MAX_CONC:-15}"; \
 		EXTRA=""; \
 		if [ -n "$${PREDICT_IN:-}" ]; then \
-		  PRED="$${PREDICT_IN}"; \
-		  # If user wrote: make PREDICT_IN=".../path...", remove the literal quotes
-		  PRED="$${PRED%\"}"; PRED="$${PRED#\"}"; PRED="$${PRED%\'}"; PRED="$${PRED#\'}"; \
-		  EXTRA="--predict-in=$$PRED"; \
+			PRED="$${PREDICT_IN}"; \
+			PRED="$${PRED%\"}"; PRED="$${PRED#\"}"; PRED="$${PRED%\'}"; PRED="$${PRED#\'}"; \
+			EXTRA="--predict-in=$$PRED"; \
 		fi; \
 		"$$PY" tools/benchmark_factory.py \
-		  --training-root "$$TRAINING_ROOT" \
-          --benchmark-root "$$BENCHMARK_ROOT" \
-		  --corpus-base "$$BENCHMARK_CORPUS_BASE" \
-		  --corpus-root "$$CORPUS_ROOT" \
-		  --variants-json tools/benchmark_variants.json \
-		  --max-concurrent "$$MAX_CONC" \
-		  $$EXTRA )
+			--training-root "$$TRAINING_ROOT" \
+			--benchmark-root "$$BENCHMARK_ROOT" \
+			--corpus-base "$$BENCHMARK_CORPUS_BASE" \
+			--corpus-root "$$CORPUS_ROOT" \
+			--variants-json tools/benchmark_variants.json \
+			--max-concurrent "$$MAX_CONC" \
+			$$EXTRA; \
+	)
 
 gpu-predict: env-check ## Submit all GPU prediction arrays
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/pred_models.batch"
