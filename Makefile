@@ -164,13 +164,18 @@ status: ## Show last 20 training job logs
 # ───────────────────────── benchmark ────────────────────────
 benchmark-configs: env-check ## Generate pred/eval cfgs + pred batches
 	@$(call WITH_VENV, \
-		CORPUS_ROOT="$${CORPUS_ROOT:-data/benchmark_corpus_v1}"; \
+		CORPUS_ROOT="$${CORPUS_ROOT:-benchmark_corpus_v1}"; \
 		MAX_CONC="$${MAX_CONC:-15}"; \
 		EXTRA=""; \
-		if [ -n "$${PREDICT_IN:-}" ]; then EXTRA="--predict-in \"$${PREDICT_IN}\""; fi; \
+		if [ -n "$${PREDICT_IN:-}" ]; then \
+		  PRED="$${PREDICT_IN}"; \
+		  # If user wrote: make PREDICT_IN=".../path...", remove the literal quotes
+		  PRED="$${PRED%\"}"; PRED="$${PRED#\"}"; PRED="$${PRED%\'}"; PRED="$${PRED#\'}"; \
+		  EXTRA="--predict-in=$$PRED"; \
+		fi; \
 		"$$PY" tools/benchmark_factory.py \
 		  --training-root "$$TRAINING_ROOT" \
-		  --benchmark-root "$$BENCHMARK_ROOT" \
+          --benchmark-root "$$BENCHMARK_ROOT" \
 		  --corpus-base "$$BENCHMARK_CORPUS_BASE" \
 		  --corpus-root "$$CORPUS_ROOT" \
 		  --variants-json tools/benchmark_variants.json \

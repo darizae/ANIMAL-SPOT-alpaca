@@ -159,6 +159,14 @@ def _discover_model_artifacts(training_root: Path) -> list[Path]:
                     artifacts.append(hits[0].resolve())
     return artifacts
 
+def _assert_no_quotes(s: str) -> str:
+    if '"' in s or "'" in s:
+        raise ValueError(
+            f"--predict-in contains quote characters: {s!r}\n"
+            "Pass the path without quotes (e.g. make PREDICT_IN=/abs/path)."
+        )
+    return s
+
 def main(args: argparse.Namespace) -> None:
     repo_root = REPO_ROOT
     training_root = Path(args.training_root).resolve() if args.training_root else DEFAULT_TRAINING_ROOT
@@ -168,7 +176,8 @@ def main(args: argparse.Namespace) -> None:
     #  - if --predict-in is given: use it (absolute or relative to repo)
     #  - else: <corpus_base>/<corpus_root>/labelled_recordings (previous default)
     if args.predict_in:
-        pred_in_path = Path(args.predict_in)
+        raw = _assert_no_quotes(args.predict_in)
+        pred_in_path = Path(raw)
         predict_in = (pred_in_path if pred_in_path.is_absolute() else (repo_root / pred_in_path)).resolve()
     else:
         corpus_base = Path(args.corpus_base).resolve() if args.corpus_base else DEFAULT_CORPUS_BASE
