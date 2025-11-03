@@ -1,33 +1,31 @@
-#!/usr/bin/env python3
-"""
-RF post-processing for ANIMAL-SPOT benchmark runs (always extract ALL features).
-
-Given a run_root (…/BENCHMARK/runs/<model>/<variant>), this script:
-  • reads evaluation selection tables (…/evaluation/annotations/*.annotation.result.txt)
-  • extracts Raven-style robust spectral features + MFCC summaries (optionally with Δ/ΔΔ)
-  • passes through CNN logit (mean) if present in the tables
-  • loads a pickled RandomForestClassifier
-  • scores each selection with rf_prob (P(target)) and keeps rf_prob >= threshold
-  • writes RF-filtered selection tables to …/postrf/annotations/
-  • writes …/postrf/features_py/<table>.features_all.csv (for traceability)
-  • writes …/postrf/index.json (same schema as evaluation/index.json + RF meta)
-
-Run with an rf.cfg produced by tools/rf_factory.py, or pass a run_root directly
-for quick local testing (defaults kick in).
-"""
-
 from __future__ import annotations
-from pathlib import Path
-import argparse, json, math, sys, re
-import pandas as pd
-import numpy as np
-import joblib
+
+import argparse
+import json
+import re
+import sys
 from datetime import datetime
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
 import soundfile as sf
+
+import warnings
+
+try:
+    from sklearn.exceptions import InconsistentVersionWarning
+
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except Exception:
+    pass
 
 # Reuse in-repo feature code
 sys.path.append(str(Path(__file__).resolve().parents[0]))  # random_forest/
 from audio_features import raven_robust_features, mfcc_summary
+
+
 
 # ───────────────────────────── helpers ──────────────────────────────
 
@@ -86,14 +84,14 @@ def load_wave(audio_root: Path, wave_name: str) -> tuple[np.ndarray, int]:
         if not cands:
             low = base.lower()
             cands = [p for p in audio_root.glob("*")
-                     if p.suffix.lower()==".wav" and p.name.lower().startswith(low)]
+                     if p.suffix.lower() == ".wav" and p.name.lower().startswith(low)]
         if not cands:
             raise FileNotFoundError(f"WAV not found: {audio_root}/{wave_name}")
 
         # Prefer ones that explicitly contain '.wav_' right after the base; else shortest name
         pref = [p for p in cands if p.name.lower().startswith(f"{base.lower()}.wav_")]
         cand = sorted(pref, key=lambda p: (len(p.name), p.name))[0] if pref else \
-               sorted(cands, key=lambda p: (len(p.name), p.name))[0]
+            sorted(cands, key=lambda p: (len(p.name), p.name))[0]
 
     y, sr = sf.read(cand, always_2d=False)
     if y.ndim > 1:
@@ -246,7 +244,7 @@ def main():
         run_root = Path(kv["run_root"]).resolve()
         audio_root = Path(kv["audio_dir"]).resolve()
         rf_model_path = Path(kv["rf_model_path"]).resolve()
-        rf_threshold = float(kv.get("rf_threshold", "0.53"))
+        rf_threshold = float(kv.get("rf_threshold", "0.4"))
         n_fft = int(kv.get("n_fft", "2048"))
         hop = int(kv.get("hop", "1024"))
         n_mfcc = int(kv.get("n_mfcc", "13"))

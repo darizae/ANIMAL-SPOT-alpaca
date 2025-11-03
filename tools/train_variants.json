@@ -1,20 +1,18 @@
 {
   "globals": {
-    "src_dir": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT",
-    "data_root": "/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data/training_corpus_v1",
-    "runs_root": "/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/TRAINING/runs",
-
+    "src_dir": "/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/ANIMAL-SPOT",
+    "data_root": "/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/data/training_corpus_v1",
+    "runs_root": "/projects/extern/kisski/kisski-alpaca-2/dir.project/repos/ANIMAL-SPOT-alpaca/TRAINING/runs",
     "sequence_len": 400,
     "n_fft": 2048,
     "hop_length": 1024,
-
     "slurm": {
       "partition": "kisski",
       "gpus": "A100:2",
       "cpus": 8,
       "nodes": 1,
       "time": "00:15:00",
-      "account": "kisski-dpz-alpaca-hum"
+      "account": "kisski-alpaca-2"
     }
   }
 }

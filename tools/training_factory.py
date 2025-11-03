@@ -2,53 +2,71 @@
 """
 Generate one ANIMAL-SPOT cfg + one Slurm array script per training variant.
 
-Result:
-    TRAINING/cfg/<variant>/alpaca_server.cfg
-    TRAINING/jobs/train_models.sbatch      (array calls start_training.py)
+Outputs:
+  TRAINING/cfg/<variant>/alpaca_server.cfg
+  TRAINING/jobs/train_models.sbatch
 """
-
 from __future__ import annotations
 
-import json, shutil, textwrap, os, argparse
+import argparse
+import json
+import os
+import textwrap
 from pathlib import Path
 
+
+def load_dotenv_from_repo() -> Path:
+    repo_root = Path(__file__).resolve().parents[1]
+    env_path = repo_root / ".env"
+    if env_path.exists():
+        for ln in env_path.read_text().splitlines():
+            ln = ln.strip()
+            if not ln or ln.startswith("#") or "=" not in ln:
+                continue
+            k, v = ln.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+    return repo_root
+
+
+REPO_ROOT = load_dotenv_from_repo()
+
 TEMPLATE_CFG = textwrap.dedent("""\
-    src_dir={src_dir}
-    debug=true
-    data_dir={data_dir}
-    cache_dir={runs_root}/cache
-    model_dir={run_dir}/models
-    checkpoint_dir={run_dir}/checkpoints
-    log_dir={run_dir}/logs
-    summary_dir={run_dir}/summaries
-    noise_dir=None
-    start_from_scratch=true
-    max_train_epochs=40        
-    jit_save=false
-    epochs_per_eval=2
-    batch_size=16              
-    num_workers=0
-    no_cuda=false
-    lr=1e-5
-    beta1=0.5
-    lr_patience_epochs=8
-    lr_decay_factor=0.5
-    early_stopping_patience_epochs=10
-    filter_broken_audio=false
-    sequence_len={sequence_len}
-    freq_compression=linear
-    n_freq_bins=128
-    n_fft={n_fft}
-    hop_length={hop_length}
-    sr=48000
-    augmentation=true
-    resnet=18
-    conv_kernel_size=7
-    num_classes=2
-    max_pool=2
-    min_max_norm=true
-    fmin=0
-    fmax=4000
+src_dir={src_dir}
+debug=true
+data_dir={data_dir}
+cache_dir={runs_root}/cache
+model_dir={run_dir}/models
+checkpoint_dir={run_dir}/checkpoints
+log_dir={run_dir}/logs
+summary_dir={run_dir}/summaries
+noise_dir=None
+start_from_scratch=true
+max_train_epochs=40
+jit_save=false
+epochs_per_eval=2
+batch_size=16
+num_workers=0
+no_cuda=false
+lr=1e-5
+beta1=0.5
+lr_patience_epochs=8
+lr_decay_factor=0.5
+early_stopping_patience_epochs=10
+filter_broken_audio=false
+sequence_len={sequence_len}
+freq_compression=linear
+n_freq_bins=128
+n_fft={n_fft}
+hop_length={hop_length}
+sr=48000
+augmentation=true
+resnet=18
+conv_kernel_size=7
+num_classes=2
+max_pool=2
+min_max_norm=true
+fmin=0
+fmax=4000
 """)
 
 SBATCH_HEADER = """\
@@ -66,46 +84,83 @@ SBATCH_HEADER = """\
 #SBATCH -a 0-{max_idx}%{concurrency}
 #SBATCH --chdir={repo_root}
 
-# ---- module / env bootstrap ----
-export PATH=/user/d.arizaecheverri/u17184/.project/dir.project/micromamba:$PATH
-eval "$(micromamba shell hook --shell=bash)"
-micromamba activate /user/d.arizaecheverri/u17184/.project/dir.project/micromamba/envs/animal-spot
+set -euo pipefail
+
+export REPO_ROOT="{repo_root}"
+
+if [[ -f "$REPO_ROOT/.env" ]]; then
+  set -a
+  source "$REPO_ROOT/.env"
+  set +a
+fi
+
+VENV_PY="$REPO_ROOT/.venv/bin/python"
+VENV_ACT="$REPO_ROOT/.venv/bin/activate"
+if [[ ! -x "$VENV_PY" ]]; then
+  echo "❌ Missing venv at $REPO_ROOT/.venv."
+  echo "   On a login node, run:"
+  echo "     cd $REPO_ROOT && python3.11 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+  exit 1
+fi
+source "$VENV_ACT"
+PY="$VENV_PY"
+
+echo "Using python: $(which python)"
+python -c "import sys; print('sys.version:', sys.version)"
+python -c "import torch, torchvision; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), '| tv', torchvision.__version__)"
 
 CONFIGS=({config_paths})
-python {repo_root}/TRAINING/start_training.py "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}}"
+"$PY" "{repo_root}/TRAINING/start_training.py" "${{CONFIGS[$SLURM_ARRAY_TASK_ID]}}"
 """
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_root", type=Path, default=Path(
-        "/user/d.arizaecheverri/u17184/.project/dir.project/alpaca-segmentation/data/training_corpus_v1"),
-                        help="Root path containing dataset_<variant> folders")
-    args = parser.parse_args()
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--data_root",
+        type=Path,
+        default=None,
+        help="Root containing dataset_<variant> folders (overrides .env/JSON).",
+    )
+    args = ap.parse_args()
 
-    json_path = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca/tools/train_variants.json")
+    repo_root = Path(os.getenv("REPO_ROOT", REPO_ROOT)).resolve()
+
+    json_path = repo_root / "tools" / "train_variants.json"
+    if not json_path.exists():
+        raise FileNotFoundError(f"Missing training variants JSON: {json_path}")
     cfg = json.loads(json_path.read_text())
     g = cfg["globals"]
 
-    repo_root = Path("/user/d.arizaecheverri/u17184/repos/ANIMAL-SPOT-alpaca")
-    runs_root = Path(g["runs_root"])
-    runs_root.joinpath("job_logs").mkdir(parents=True, exist_ok=True)
+    g["src_dir"] = os.getenv("SRC_DIR", g.get("src_dir", str(repo_root / "ANIMAL-SPOT")))
+    runs_root = Path(os.getenv("TRAINING_ROOT", os.getenv("TRAINING_RUNS_ROOT", g["runs_root"]))).resolve()
 
-    # scan for datasets
-    dataset_folders = sorted([p for p in args.data_root.iterdir() if p.is_dir() and p.name.startswith("dataset_")])
-    config_paths = []
+    if args.data_root is not None:
+        data_root = args.data_root
+    else:
+        env_data_root = os.getenv("TRAINING_DATA_ROOT")
+        data_root = Path(env_data_root) if env_data_root else Path(g["data_root"])
 
+    (runs_root / "job_logs").mkdir(parents=True, exist_ok=True)
+
+    data_root = Path(data_root).resolve()
+    if not data_root.exists():
+        raise FileNotFoundError(f"TRAINING_DATA_ROOT not found: {data_root}")
+
+    dataset_folders = sorted(p for p in data_root.iterdir() if p.is_dir() and p.name.startswith("dataset_"))
+    if not dataset_folders:
+        raise RuntimeError(f"No dataset_* folders found under {data_root}")
+
+    config_paths: list[Path] = []
     for idx, dataset_dir in enumerate(dataset_folders, start=1):
         variant_name = f"v{idx}_{dataset_dir.name.replace('dataset_', '')}"
-        data_dir = dataset_dir
-
         run_dir = runs_root / f"models/{variant_name}"
         cfg_dir = repo_root / "TRAINING" / "cfg" / variant_name
         cfg_dir.mkdir(parents=True, exist_ok=True)
 
         filled = TEMPLATE_CFG.format(
             src_dir=g["src_dir"],
-            data_dir=data_dir,
+            data_dir=dataset_dir,
             runs_root=runs_root,
             run_dir=run_dir,
             sequence_len=g["sequence_len"],
@@ -116,29 +171,41 @@ def main():
         cfg_path.write_text(filled)
         config_paths.append(cfg_path)
 
-    # build sbatch array script
     sl = g["slurm"]
+    partition = os.getenv("SLURM_PARTITION", sl["partition"])
+    nodes = os.getenv("SLURM_NODES", str(sl["nodes"]))
+    gpus = os.getenv("SLURM_GPUS", str(sl["gpus"]))
+    cpus = os.getenv("SLURM_CPUS", str(sl["cpus"]))
+    time = sl["time"]
+    account = os.getenv("SLURM_ACCOUNT", sl["account"])
+
+    total = len(config_paths)
+    max_concurrency_json = int(sl.get("max_concurrency", total))
+    concurrency = max(1, min(total, int(os.getenv("SLURM_CONCURRENCY", max_concurrency_json))))
+
     sbatch_txt = SBATCH_HEADER.format(
-        partition=sl["partition"],
-        nodes=sl["nodes"],
-        gpus=sl["gpus"],
-        cpus=sl["cpus"],
-        time=sl["time"],
-        account=sl["account"],
+        partition=partition,
+        nodes=nodes,
+        gpus=gpus,
+        cpus=cpus,
+        time=time,
+        account=account,
         runs_root=runs_root,
         repo_root=repo_root,
-        max_idx=len(config_paths) - 1,
-        concurrency=len(config_paths),
-        config_paths=" ".join(str(p) for p in config_paths)
+        max_idx=total - 1,
+        concurrency=concurrency,
+        config_paths=" ".join(str(p) for p in config_paths),
     )
+
     jobs_dir = repo_root / "TRAINING" / "jobs"
-    jobs_dir.mkdir(exist_ok=True)
-    (jobs_dir / "train_models.sbatch").write_text(sbatch_txt)
+    jobs_dir.mkdir(parents=True, exist_ok=True)
+    sbatch_path = jobs_dir / "train_models.sbatch"
+    sbatch_path.write_text(sbatch_txt)
 
     print(f"✔ Generated {len(config_paths)} cfg files and Slurm job array script:")
     for p in config_paths:
         print("  ", p.relative_to(repo_root))
-    print("  ", (jobs_dir / "train_models.sbatch").relative_to(repo_root))
+    print("  ", sbatch_path.relative_to(repo_root))
 
 
 if __name__ == "__main__":
