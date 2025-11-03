@@ -109,17 +109,13 @@ endef
 
 .PHONY: upload upload-all
 
-upload: ## Upload one corpus folder to the cluster (make upload CORPUS=training_corpus_v1 | SRC=/abs/path)
-	@$(LOAD_UPLOAD_ENV) \
-	if [ -n "$(SRC)" ]; then SRC_DIR="$(SRC)"; \
-	elif [ -n "$(CORPUS)" ]; then SRC_DIR="$$(pwd)/data/$(CORPUS)"; \
-	else echo "✖ Set CORPUS=training_corpus_v1 (or benchmark_corpus_v1) OR SRC=/absolute/path"; exit 1; fi; \
-	[ -d "$$SRC_DIR" ] || { echo "✖ No such directory: $$SRC_DIR"; exit 1; }; \
-	BNAME="$$(basename "$$SRC_DIR")"; \
-	DEST="$$UPLOAD_USER@$$UPLOAD_HOST:$$UPLOAD_PATH/$$BNAME"; \
-	echo "⇪ Upload $$SRC_DIR  →  $$DEST"; \
-	ssh "$$UPLOAD_USER@$$UPLOAD_HOST" "mkdir -p '$$UPLOAD_PATH/$$BNAME'"; \
-	$(RSYNC) -e "ssh -T" "$$SRC_DIR/" "$$UPLOAD_USER@$$UPLOAD_HOST:$$UPLOAD_PATH/$$BNAME/"
+upload: ## Upload any local file or folder to the cluster (make upload SRC=/path/to/data)
+	@if [ -z "$(SRC)" ]; then \
+		echo "✖ Usage: make upload SRC=/absolute/path/to/file_or_folder"; \
+		exit 1; \
+	fi; \
+	echo "⇪ Using data_preprocessing/upload_datasets.sh for upload"; \
+	bash data_preprocessing/upload_datasets.sh "$(SRC)"
 
 upload-all: ## Upload both corpora (training_corpus_v1 and benchmark_corpus_v1)
 	@$(MAKE) upload CORPUS=training_corpus_v1

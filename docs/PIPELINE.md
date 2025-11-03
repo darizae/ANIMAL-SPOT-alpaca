@@ -154,25 +154,23 @@ After building, verify stats using:
 python data_preprocessing/count_dataset_files.py
 ```
 
-### Data upload (run locally via `alpaca-segmentation` script)
+---
 
-Always upload datasets from your **local machine** using the script in `alpaca-segmentation`.
-
-**Set your project once** inside the script:
+### 📤 Data Upload (Local → HPC)
 
 ```bash
-# in alpaca-segmentation/data_preprocessing/upload_datasets.sh
-PROJECT_NAME="kisski-alpaca-2"   # ← change to your HPC project if different
+# From your local machine
+make upload SRC=/absolute/path/to/file_or_folder
 ```
 
-Then run (locally):
+Example:
 
 ```bash
-cd /path/to/alpaca-segmentation
-chmod +x data_preprocessing/upload_datasets.sh
-./data_preprocessing/upload_datasets.sh data/training_corpus_v1
-./data_preprocessing/upload_datasets.sh data/benchmark_corpus_v1
+make upload SRC="/Volumes/Seagate Portable Drive/2025/388_m32_20250213.zip"
 ```
+
+That’s it — no corpus names, no manual folders, no extra steps.
+
 
 ---
 
