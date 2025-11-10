@@ -221,7 +221,7 @@ if __name__ == "__main__":
 
     if os.path.isdir(ARGS.input_file):
         audio_folder = Path(ARGS.input_file)
-        audio_files = [f for f in os.listdir(ARGS.input_file) if f.endswith(".wav")]
+        audio_files = [f for f in os.listdir(ARGS.input_file) if f.lower().endswith(".wav")]
     else:
         audio_folder = None
         audio_files = [ARGS.input_file]
