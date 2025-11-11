@@ -247,7 +247,7 @@ def main(args: argparse.Namespace) -> None:
             slurm_gpus=os.getenv("SLURM_GPUS", "A100:2"),
             slurm_cpus=int(os.getenv("SLURM_CPUS", "8")),
             slurm_constraint=os.getenv("SLURM_CONSTRAINT", ""),
-            slurm_pred_time=os.getenv("SLURM_PRED_TIME", "01:00:00"),
+            slurm_pred_time=os.getenv("SLURM_PRED_TIME", "010:00:00"),
             slurm_account=os.getenv("SLURM_ACCOUNT", "kisski-alpaca-2"),
         )
         batch_path = jobs_dir / f"pred_{model_name}.batch"
