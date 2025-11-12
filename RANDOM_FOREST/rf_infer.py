@@ -84,7 +84,7 @@ def load_wave(audio_root: Path, wave_name: str) -> tuple[np.ndarray, int]:
         if not cands:
             low = base.lower()
             cands = [p for p in audio_root.glob("*")
-                     if p.suffix.lower() == ".wav" and p.name.lower().startswith(low.lower()):]
+                     if p.suffix.lower() == ".wav" and p.name.lower().startswith(low)]
         if not cands:
             raise FileNotFoundError(f"WAV not found: {audio_root}/{wave_name}")
 
