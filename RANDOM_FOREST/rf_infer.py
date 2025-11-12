@@ -29,6 +29,11 @@ from audio_features import raven_robust_features, mfcc_summary
 
 # ───────────────────────────── helpers ──────────────────────────────
 
+_WAV_FROM_TABLE = re.compile(
+    r"^(?P<stem>.+?)_predict_output(?:\.log)?\.annotation\.result\.txt$",
+    re.IGNORECASE,
+)
+
 SEL_HEADER = [
     "Selection", "View", "Channel",
     "Begin time (s)", "End time (s)", "Low Freq (Hz)", "High Freq (Hz)",
