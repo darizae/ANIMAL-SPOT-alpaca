@@ -37,20 +37,28 @@ SEL_HEADER = [
 
 
 def read_sel_table(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path, sep="\t")
+    df = pd.read_csv(path, sep="\t", dtype=str)
+
     # ensure optional CNN column exists
     if "CNN logit (mean)" not in df.columns:
         df["CNN logit (mean)"] = np.nan
+
     needed = {"Selection", "Begin time (s)", "End time (s)", "Low Freq (Hz)", "High Freq (Hz)"}
     missing = needed - set(df.columns)
     if missing:
         raise ValueError(f"{path.name} missing columns: {missing}")
+
+    # sanity-check numeric columns
+    for col in ["Begin time (s)", "End time (s)", "Low Freq (Hz)", "High Freq (Hz)"]:
+        bad = pd.to_numeric(df[col], errors="coerce").isna()
+        if bad.any():
+            example = df.loc[bad, ["Selection", col]].head()
+            raise ValueError(
+                f"{path.name}: non-numeric values in '{col}'. "
+                f"Examples:\n{example.to_string(index=False)}"
+            )
+
     return df
-
-
-_WAV_FROM_TABLE = re.compile(
-    r"^(?P<stem>.+?)_predict_output(?:\.log)?\.annotation\.result\.txt$", re.IGNORECASE
-)
 
 
 def derive_wave_from_table_name(txt_path: Path) -> str:
