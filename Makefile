@@ -197,7 +197,7 @@ rf-batches: env-check ## Build RF cfgs + batch (no args; auto-discovers everythi
 	@$(call WITH_VENV, \
 		"$$PY" tools/rf_factory.py )
 
-rf-run: env-check ## Submit RF batch (CPU)
+rf-filter: env-check ## Submit RF batch (CPU)
 	@$(ACTIVATED) bash "$$BENCHMARK_ROOT/jobs/rf_runs.batch"
 
 # ───────────────────────── extract clips ────────────────
