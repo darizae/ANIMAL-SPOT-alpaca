@@ -309,22 +309,36 @@ class setup_evaluator(object):
     def write_annotation_file(self, path_annotation_file, annotation_data):
         os.makedirs(os.path.dirname(path_annotation_file), exist_ok=True)
         iterator = 1
-        annotated_prediction_file = open(path_annotation_file, 'w')
-        annotated_prediction_file.write("\t".join(self.needed_annotation_columns)+"\n")
-        for label, __, start, end, cnn_logit_mean, __ in annotation_data:
-            if label == "noise" and self.config_data.get("noise_in_anno") == None:
-                continue
-            else:
-                annotated_prediction_file.write(
-                    str(iterator) + "\tSpectrogram_1\t1\t" +
-                    str(start) + "\t" + str(end) + "\t" +
-                    str(self.data_opts.get("fmin")) + "\t" +
-                    str(self.data_opts.get("fmax")) + "\t" +
-                    label + "\t" +
-                    "\t \t" + (str(cnn_logit_mean) if cnn_logit_mean == cnn_logit_mean else "") + "\n"
-                )
-            iterator += 1
-        annotated_prediction_file.close()
+        with open(path_annotation_file, 'w') as annotated_prediction_file:
+            # header
+            annotated_prediction_file.write("\t".join(self.needed_annotation_columns) + "\n")
+
+            for label, __, start, end, cnn_logit_mean, __ in annotation_data:
+                # optionally skip noise
+                if label == "noise" and self.config_data.get("noise_in_anno") is None:
+                    continue
+
+                # NaN-safe string for CNN score
+                if cnn_logit_mean != cnn_logit_mean:  # NaN check
+                    cnn_str = ""
+                else:
+                    cnn_str = str(cnn_logit_mean)
+
+                row = [
+                    str(iterator),  # Selection
+                    "Spectrogram_1",  # View
+                    "1",  # Channel
+                    str(start),  # Begin time (s)
+                    str(end),  # End time (s)
+                    str(self.data_opts.get("fmin")),  # Low Freq (Hz)
+                    str(self.data_opts.get("fmax")),  # High Freq (Hz)
+                    label,  # Sound type
+                    "",  # Comments (empty)
+                    cnn_str,  # CNN logit (mean)
+                ]
+
+                annotated_prediction_file.write("\t".join(row) + "\n")
+                iterator += 1
 
     def list_all_files_in_dir(self, path):
         onlyfiles = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
