@@ -131,7 +131,7 @@ def main() -> None:
             slurm_partition=os.getenv("SLURM_PARTITION", "kisski"),
             slurm_nodes=int(os.getenv("SLURM_NODES", "1")),
             slurm_cpus=int(os.getenv("SLURM_CPUS", "8")),
-            slurm_eval_time=os.getenv("SLURM_EVAL_TIME", "04:00:00"),
+            slurm_eval_time=os.getenv("SLURM_EVAL_TIME", "08:00:00"),
             slurm_account=os.getenv("SLURM_ACCOUNT", "kisski-alpaca-2"),
         )
         batch_path = jobs_dir / f"eval_{model}.batch"
