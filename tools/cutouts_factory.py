@@ -75,9 +75,16 @@ def require(p: Path, kind: str) -> Path:
 def discover_tasks(stage: str) -> list[dict]:
     tasks = []
     cfg_root = BENCH_ROOT / "cfg"
-    for cfg_dir in sorted((p for p in cfg_root.glob("*/*") if p.is_dir())):
-        model, variant = cfg_dir.parent.name, cfg_dir.name
-        run_root = BENCH_ROOT / "runs" / model / variant
+    # NEW: three-level layout: cfg/<model>/<tag>/<dataset>
+    for cfg_dir in sorted((p for p in cfg_root.glob("*/*/*") if p.is_dir())):
+        # cfg_dir = …/cfg/<model>/<tag>/<dataset>
+        dataset = cfg_dir.name
+        tag_dir = cfg_dir.parent
+        variant = tag_dir.name              # "len400_hop050_th90"
+        model = tag_dir.parent.name
+
+        run_root = BENCH_ROOT / "runs" / model / variant / dataset
+
         # audio_dir from rf.cfg (preferred) or predict.cfg (when stage=evaluation and rf absent)
         rf_cfg = cfg_dir / "rf.cfg"
         if rf_cfg.exists():

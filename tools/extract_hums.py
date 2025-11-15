@@ -68,12 +68,15 @@ def write_cut(src_path: Path, out_path: Path, t0: float, t1: float) -> None:
 # ────────── discovery: audio root from cfgs next to the run ──────────
 def discover_audio_root(run_root: Path) -> Path:
     """
-    Primary: BENCHMARK/cfg/<model>/<variant>/rf.cfg -> audio_dir=...
+    Primary: BENCHMARK/cfg/<model>/<variant>/<dataset>/rf.cfg -> audio_dir=...
     Fallback-for-evaluation-mode-only: predict.cfg -> parent of input_file
     """
-    bench_root = run_root.parents[2]
-    model, variant = run_root.parents[1].name, run_root.name
-    cfg_dir = bench_root / "cfg" / model / variant
+    # run_root = BENCHMARK/runs/<model>/<variant>/<dataset>
+    bench_root = run_root.parents[3]  # …/BENCHMARK
+    dataset = run_root.name
+    variant = run_root.parent.name
+    model = run_root.parent.parent.name
+    cfg_dir = bench_root / "cfg" / model / variant / dataset
 
     rf_cfg = cfg_dir / "rf.cfg"
     if rf_cfg.exists():

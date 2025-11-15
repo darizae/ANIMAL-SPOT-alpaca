@@ -111,8 +111,9 @@ def main() -> None:
 
     # group eval.cfg paths by model
     cfgs_by_model: dict[str, list[Path]] = {}
-    for cfg in cfg_root.glob("*/*/eval.cfg"):
-        model = cfg.parents[1].name  # …/cfg/<model>/<variant>/eval.cfg
+    for cfg in cfg_root.glob("*/*/*/eval.cfg"):
+        # …/cfg/<model>/<tag>/<dataset>/eval.cfg
+        model = cfg.parents[2].name
         cfgs_by_model.setdefault(model, []).append(cfg.resolve())
 
     # write one batch per model

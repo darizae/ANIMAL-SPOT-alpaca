@@ -113,7 +113,8 @@ def main() -> None:
     jobs_dir = BENCH_ROOT / "jobs"
     (jobs_dir / "job_logs").mkdir(parents=True, exist_ok=True)
 
-    eval_cfgs = sorted(cfg_root.glob("*/*/eval.cfg"))
+    # NEW: three-level cfg layout: cfg/<model>/<tag>/<dataset>/eval.cfg
+    eval_cfgs = sorted(cfg_root.glob("*/*/*/eval.cfg"))
     if not eval_cfgs:
         raise RuntimeError(f"No eval.cfg files under {cfg_root}")
 
@@ -130,11 +131,13 @@ def main() -> None:
 
     rf_cfgs = []
     for eval_cfg in eval_cfgs:
-        cfg_dir = eval_cfg.parent
-        model = cfg_dir.parent.name
-        variant = cfg_dir.name
-        run_root = (BENCH_ROOT / "runs" / model / variant).resolve()
+        cfg_dir = eval_cfg.parent             # …/cfg/<model>/<tag>/<dataset>
+        dataset = cfg_dir.name                # "388_m32_20250213"
+        tag_dir = cfg_dir.parent              # …/cfg/<model>/<tag>
+        variant = tag_dir.name                # "len400_hop050_th90"
+        model = tag_dir.parent.name           # "<model>"
 
+        run_root = (BENCH_ROOT / "runs" / model / variant / dataset).resolve()
         audio_dir = require_audio_dir(cfg_dir)
 
         cfg_path = cfg_dir / "rf.cfg"

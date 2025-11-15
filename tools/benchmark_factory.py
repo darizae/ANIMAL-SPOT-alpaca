@@ -121,6 +121,7 @@ DEFAULT_BENCHMARK_ROOT = Path(os.getenv("BENCHMARK_ROOT", REPO_ROOT / "BENCHMARK
 DEFAULT_SRC_DIR = Path(os.getenv("SRC_DIR", REPO_ROOT / "ANIMAL-SPOT")).resolve()
 DEFAULT_CORPUS_BASE = Path(os.getenv("BENCHMARK_CORPUS_BASE", os.getenv("DATA_ROOT", REPO_ROOT / "data"))).resolve()
 
+
 def _candidate_run_roots(training_root: Path) -> list[Path]:
     roots = []
     if (training_root / "models").exists():
@@ -131,8 +132,10 @@ def _candidate_run_roots(training_root: Path) -> list[Path]:
     for r in roots:
         rp = r.resolve()
         if rp not in seen:
-            uniq.append(rp); seen.add(rp)
+            uniq.append(rp);
+            seen.add(rp)
     return uniq
+
 
 def _discover_model_artifacts(training_root: Path) -> list[Path]:
     artifacts: list[Path] = []
@@ -145,7 +148,7 @@ def _discover_model_artifacts(training_root: Path) -> list[Path]:
                 continue
             models_dir = variant_dir / "models"
             ckpt_dir = variant_dir / "checkpoints"
-            for pats in (("ANIMAL-SPOT.pk",), ("*.pk",), ("*.pt","*.pth")):
+            for pats in (("ANIMAL-SPOT.pk",), ("*.pk",), ("*.pt", "*.pth")):
                 hits = []
                 for pat in pats:
                     hits += list(models_dir.glob(pat))
@@ -159,6 +162,7 @@ def _discover_model_artifacts(training_root: Path) -> list[Path]:
                     artifacts.append(hits[0].resolve())
     return artifacts
 
+
 def _assert_no_quotes(s: str) -> str:
     if '"' in s or "'" in s:
         raise ValueError(
@@ -167,22 +171,27 @@ def _assert_no_quotes(s: str) -> str:
         )
     return s
 
+
 def main(args: argparse.Namespace) -> None:
     repo_root = REPO_ROOT
     training_root = Path(args.training_root).resolve() if args.training_root else DEFAULT_TRAINING_ROOT
     bench_root = Path(args.benchmark_root).resolve() if args.benchmark_root else DEFAULT_BENCHMARK_ROOT
 
-    # Determine prediction input:
-    #  - if --predict-in is given: use it (absolute or relative to repo)
-    #  - else: <corpus_base>/<corpus_root>/labelled_recordings (previous default)
+    # Determine prediction input and dataset name:
+    #  - if --predict-in is given: use it (absolute or relative to repo), and
+    #    derive dataset_name from the directory name
+    #  - else: <corpus_base>/<corpus_root>/labelled_recordings and
+    #    use corpus_root as dataset_name
     if args.predict_in:
         raw = _assert_no_quotes(args.predict_in)
         pred_in_path = Path(raw)
         predict_in = (pred_in_path if pred_in_path.is_absolute() else (repo_root / pred_in_path)).resolve()
+        dataset_name = predict_in.name  # e.g. "388_m32_20250213"
     else:
         corpus_base = Path(args.corpus_base).resolve() if args.corpus_base else DEFAULT_CORPUS_BASE
         corpus_root = (corpus_base / args.corpus_root).resolve()
-        predict_in = corpus_root / "labelled_recordings"
+        predict_in = (corpus_root / "labelled_recordings").resolve()
+        dataset_name = args.corpus_root
 
     # Load variants and resolve source dir
     variants = json.loads(Path(args.variants_json).read_text())
@@ -196,6 +205,7 @@ def main(args: argparse.Namespace) -> None:
 
     print(f"🔎 training_root  = {training_root}")
     print(f"🔎 prediction in  = {predict_in}")
+    print(f"🔎 dataset_name   = {dataset_name}")
 
     model_files = _discover_model_artifacts(training_root)
     if not model_files:
@@ -210,8 +220,11 @@ def main(args: argparse.Namespace) -> None:
         pred_cfgs: list[Path] = []
         for var in variants:
             tag = f"len{int(var['seq_len'] * 1000):03d}_hop{int(var['hop'] * 1000):03d}_th{int(var['threshold'] * 100):02d}"
-            out_root = bench_root / "runs" / model_name / tag
-            cfg_dir = bench_root / "cfg" / model_name / tag
+
+            # NEW: tag folder + dataset subfolder
+            out_root = bench_root / "runs" / model_name / tag / dataset_name
+            cfg_dir = bench_root / "cfg" / model_name / tag / dataset_name
+
             (out_root / "prediction").mkdir(parents=True, exist_ok=True)
             (out_root / "evaluation").mkdir(parents=True, exist_ok=True)
             cfg_dir.mkdir(parents=True, exist_ok=True)
@@ -234,7 +247,8 @@ def main(args: argparse.Namespace) -> None:
                 out_root=out_root, threshold=var['threshold']
             ))
 
-        # ─── batch file per model (uses .venv) ───────────────────────────────
+        # one batch file per model (uses .venv); for this call we only include
+        # the cfgs we just wrote (i.e., for this dataset_name)
         pred_batch_txt = PRED_BATCH_TMPL.render(
             model=model_name,
             n_cfgs_minus1=len(pred_cfgs) - 1,
@@ -257,7 +271,6 @@ def main(args: argparse.Namespace) -> None:
     master = jobs_dir / "pred_models.batch"
     master.write_text("#!/bin/bash\n" + "".join(f"sbatch {b}\n" for b in sorted(pred_batches)))
     print(f"📝 wrote {master}  ({len(pred_batches)} arrays)")
-
 
 
 if __name__ == "__main__":
